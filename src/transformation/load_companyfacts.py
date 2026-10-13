@@ -1,8 +1,8 @@
-
 import argparse
 import hashlib
 import json
 import time
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import duckdb
@@ -42,6 +42,17 @@ CREATE TABLE IF NOT EXISTS financial_observations (
 )
 """
 
+CREATE_METADATA_SQL = """
+CREATE TABLE IF NOT EXISTS loaded_snapshots (
+    cik INTEGER NOT NULL,
+    snapshot_id VARCHAR NOT NULL,
+    loaded_at TIMESTAMP NOT NULL,
+    row_count BIGINT NOT NULL,
+    retrieved_at_utc TIMESTAMPTZ,
+    PRIMARY KEY (cik, snapshot_id)
+)
+"""
+
 
 def latest_snapshot(ticker):
     folder = RAW_DIR / ticker
@@ -58,6 +69,41 @@ def latest_snapshot(ticker):
         )
 
     return snapshots[-1]
+
+
+def read_snapshot_metadata(snapshot_path, ticker, cik, snapshot_id):
+    metadata_path = snapshot_path.with_name(
+        f"{snapshot_path.stem}.metadata.json"
+    )
+
+    if not metadata_path.exists():
+        raise FileNotFoundError(
+            f"Missing snapshot metadata: {metadata_path}"
+        )
+
+    metadata = json.loads(
+        metadata_path.read_text(encoding="utf-8")
+    )
+
+    if metadata.get("ticker") != ticker:
+        raise ValueError("Metadata ticker mismatch")
+
+    if metadata.get("cik") != cik:
+        raise ValueError("Metadata CIK mismatch")
+
+    if metadata.get("sha256") != snapshot_id:
+        raise ValueError("Metadata SHA-256 mismatch")
+
+    retrieved_at = datetime.fromisoformat(
+        metadata["retrieved_at_utc"]
+    )
+
+    if retrieved_at.tzinfo is None:
+        raise ValueError(
+            "Snapshot retrieval timestamp must include timezone"
+        )
+
+    return retrieved_at.astimezone(timezone.utc)
 
 
 def normalize(data, snapshot_id):
@@ -116,13 +162,9 @@ def write_parquet(rows, ticker, snapshot_id):
         ("raw_observation", pa.string()),
     ])
 
-    # Arrow converts ISO date strings to date32.
-    # Use explicit conversion for predictable typing.
-    from datetime import date
-
     for row in rows:
         for column in ("start_date", "end_date", "filed_date"):
-            if row[column] is not None:
+            if isinstance(row[column], str):
                 row[column] = date.fromisoformat(row[column])
 
     table = pa.Table.from_pylist(rows, schema=schema)
@@ -131,21 +173,150 @@ def write_parquet(rows, ticker, snapshot_id):
     return output_path
 
 
-def load_duckdb(parquet_path, snapshot_id, expected_count):
+def validate_parquet(con, parquet_path, snapshot_id, cik, expected_count):
+    if expected_count <= 0:
+        raise ValueError("Cannot load an empty snapshot")
+
+    result = con.execute(
+        """
+        SELECT
+            COUNT(*) AS total_rows,
+            COUNT(*) FILTER (
+                WHERE cik IS DISTINCT FROM ?
+            ) AS wrong_cik,
+            COUNT(*) FILTER (
+                WHERE snapshot_id IS DISTINCT FROM ?
+            ) AS wrong_snapshot,
+            COUNT(DISTINCT observation_index) AS unique_indices
+        FROM read_parquet(?)
+        """,
+        [cik, snapshot_id, str(parquet_path)],
+    ).fetchone()
+
+    total, wrong_cik, wrong_snapshot, unique_indices = result
+
+    if total != expected_count:
+        raise ValueError(
+            f"Parquet count mismatch: {total} != {expected_count}"
+        )
+
+    if wrong_cik:
+        raise ValueError(
+            f"Parquet contains {wrong_cik} rows with incorrect CIK"
+        )
+
+    if wrong_snapshot:
+        raise ValueError(
+            f"Parquet contains {wrong_snapshot} rows with incorrect snapshot ID"
+        )
+
+    if unique_indices != total:
+        raise ValueError(
+            "Parquet contains duplicate or null observation indices"
+        )
+
+
+def migrate_loaded_snapshots(con):
+    columns = {
+        row[1]
+        for row in con.execute(
+            "PRAGMA table_info('loaded_snapshots')"
+        ).fetchall()
+    }
+
+    if "retrieved_at_utc" not in columns:
+        con.execute(
+            """
+            ALTER TABLE loaded_snapshots
+            ADD COLUMN retrieved_at_utc TIMESTAMPTZ
+            """
+        )
+
+
+def active_snapshot(con, cik):
+    rows = con.execute(
+        """
+        SELECT DISTINCT snapshot_id
+        FROM financial_observations
+        WHERE cik = ?
+        """,
+        [cik],
+    ).fetchall()
+
+    if len(rows) > 1:
+        raise RuntimeError(
+            f"Company {cik} has multiple active snapshots"
+        )
+
+    return rows[0][0] if rows else None
+
+
+def load_duckdb(
+    parquet_path,
+    snapshot_id,
+    expected_count,
+    cik,
+    retrieved_at_utc,
+):
+    if retrieved_at_utc.tzinfo is None:
+        raise ValueError("Retrieval timestamp must include timezone")
+
+    retrieved_at_utc = retrieved_at_utc.astimezone(timezone.utc)
+
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     con = duckdb.connect(str(DB_PATH))
+    transaction_started = False
 
     try:
         con.execute("BEGIN TRANSACTION")
+        transaction_started = True
+
         con.execute(CREATE_TABLE_SQL)
+        con.execute(CREATE_METADATA_SQL)
+        migrate_loaded_snapshots(con)
+
+        validate_parquet(
+            con,
+            parquet_path,
+            snapshot_id,
+            cik,
+            expected_count,
+        )
+
+        current_id = active_snapshot(con, cik)
+
+        if current_id is not None and current_id != snapshot_id:
+            current_row = con.execute(
+                """
+                SELECT retrieved_at_utc
+                FROM loaded_snapshots
+                WHERE cik = ?
+                  AND snapshot_id = ?
+                """,
+                [cik, current_id],
+            ).fetchone()
+
+            if current_row is None or current_row[0] is None:
+                raise RuntimeError(
+                    "Active snapshot has no retrieval timestamp. "
+                    "Run metadata migration before replacement."
+                )
+
+            current_time = current_row[0]
+
+            if retrieved_at_utc <= current_time:
+                raise ValueError(
+                    "Incoming snapshot is not newer than "
+                    "the active snapshot"
+                )
 
         con.execute(
             """
             DELETE FROM financial_observations
-            WHERE snapshot_id = ?
+            WHERE cik = ?
             """,
-            [snapshot_id],
+            [cik],
         )
 
         con.execute(
@@ -177,9 +348,10 @@ def load_duckdb(parquet_path, snapshot_id, expected_count):
             """
             SELECT COUNT(*)
             FROM financial_observations
-            WHERE snapshot_id = ?
+            WHERE cik = ?
+              AND snapshot_id = ?
             """,
-            [snapshot_id],
+            [cik, snapshot_id],
         ).fetchone()[0]
 
         if actual_count != expected_count:
@@ -187,12 +359,33 @@ def load_duckdb(parquet_path, snapshot_id, expected_count):
                 f"Count mismatch: {actual_count} != {expected_count}"
             )
 
+        con.execute(
+            """
+            INSERT INTO loaded_snapshots (
+                cik,
+                snapshot_id,
+                loaded_at,
+                row_count,
+                retrieved_at_utc
+            )
+            VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)
+            ON CONFLICT (cik, snapshot_id)
+            DO UPDATE SET
+                loaded_at = EXCLUDED.loaded_at,
+                row_count = EXCLUDED.row_count,
+                retrieved_at_utc = EXCLUDED.retrieved_at_utc
+            """,
+            [cik, snapshot_id, actual_count, retrieved_at_utc],
+        )
+
         con.execute("COMMIT")
+        transaction_started = False
 
         return actual_count
 
     except Exception:
-        con.execute("ROLLBACK")
+        if transaction_started:
+            con.execute("ROLLBACK")
         raise
 
     finally:
@@ -235,21 +428,38 @@ def main():
     payload = snapshot.read_bytes()
     data = json.loads(payload)
 
-    if data.get("cik") != COMPANIES[args.ticker]:
+    cik = COMPANIES[args.ticker]
+
+    if data.get("cik") != cik:
         raise ValueError("Snapshot CIK does not match ticker")
 
     snapshot_id = hashlib.sha256(payload).hexdigest()
+
+    retrieved_at_utc = read_snapshot_metadata(
+        snapshot,
+        args.ticker,
+        cik,
+        snapshot_id,
+    )
+
     rows = normalize(data, snapshot_id)
 
     print(f"Snapshot: {snapshot.name}")
+    print(f"Retrieved: {retrieved_at_utc.isoformat()}")
     print(f"Normalized observations: {len(rows):,}")
 
     parquet_path = write_parquet(
-        rows, args.ticker, snapshot_id
+        rows,
+        args.ticker,
+        snapshot_id,
     )
 
     loaded = load_duckdb(
-        parquet_path, snapshot_id, len(rows)
+        parquet_path,
+        snapshot_id,
+        len(rows),
+        cik,
+        retrieved_at_utc,
     )
 
     print(f"Parquet: {parquet_path}")
@@ -259,9 +469,7 @@ def main():
         print("\nMicrosoft AR — 2017-06-30")
 
         for value, filed, accession in inspect_microsoft(snapshot_id):
-            print(
-                f"{filed} | ${value:,.0f} | {accession}"
-            )
+            print(f"{filed} | ${value:,.0f} | {accession}")
 
     elapsed = time.perf_counter() - start
 
