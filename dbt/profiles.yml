@@ -1,0 +1,7 @@
+financial_intelligence:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: data/warehouse/financial_intelligence.duckdb
+      threads: 2

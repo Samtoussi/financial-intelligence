@@ -24,3 +24,9 @@ Thumbs.db
 # Phase 0 experiments
 sec_filing_spike.py
 table_spike.py
+
+# dbt generated artifacts
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/dbt/.user.yml
+dbt/.user.yml

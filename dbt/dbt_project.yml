@@ -1,0 +1,14 @@
+
+name: financial_intelligence
+version: '1.0.0'
+config-version: 2
+
+profile: financial_intelligence
+
+model-paths: ["models"]
+
+models:
+  financial_intelligence:
+    gold:
+      +materialized: table
+      +schema: gold

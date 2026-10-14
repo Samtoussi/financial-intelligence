@@ -1,0 +1,39 @@
+
+version: 2
+
+models:
+  - name: annual_revenue
+    description: "Annual revenue observations selected from SEC Company Facts, preserving source filing metadata."
+
+    columns:
+      - name: cik
+        data_tests:
+          - not_null
+
+      - name: fiscal_year
+        data_tests:
+          - not_null
+
+      - name: start_date
+        data_tests:
+          - not_null
+
+      - name: end_date
+        data_tests:
+          - not_null
+
+      - name: revenue_usd
+        data_tests:
+          - not_null
+
+      - name: source_concept
+        data_tests:
+          - not_null
+
+      - name: source_accession
+        data_tests:
+          - not_null
+
+      - name: source_filed_date
+        data_tests:
+          - not_null
