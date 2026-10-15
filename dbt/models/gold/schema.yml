@@ -1,4 +1,3 @@
-
 version: 2
 
 models:
@@ -35,5 +34,21 @@ models:
           - not_null
 
       - name: source_filed_date
+        data_tests:
+          - not_null
+
+  - name: annual_revenue_growth
+    description: "Annual revenue growth with historical comparability checks."
+
+    columns:
+      - name: cik
+        data_tests:
+          - not_null
+
+      - name: fiscal_year
+        data_tests:
+          - not_null
+
+      - name: revenue_usd
         data_tests:
           - not_null
