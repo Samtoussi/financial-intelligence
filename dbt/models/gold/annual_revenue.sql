@@ -1,6 +1,5 @@
 
 WITH revenue_observations AS (
-
     SELECT
         cik,
         concept,
@@ -11,42 +10,60 @@ WITH revenue_observations AS (
         filed_date,
         form,
 
-        CASE concept
-            WHEN 'RevenueFromContractWithCustomerExcludingAssessedTax' THEN 1
-            WHEN 'SalesRevenueNet' THEN 2
-            WHEN 'Revenues' THEN 3
+        CASE
+            -- Microsoft
+            WHEN cik = 789019
+                AND concept = 'RevenueFromContractWithCustomerExcludingAssessedTax'
+                THEN 1
+            WHEN cik = 789019
+                AND concept = 'SalesRevenueNet'
+                THEN 2
+            WHEN cik = 789019
+                AND concept = 'Revenues'
+                THEN 3
+
+            -- Caterpillar
+            WHEN cik = 18230
+                AND concept = 'Revenues'
+                THEN 1
+            WHEN cik = 18230
+                AND concept = 'SalesRevenueNet'
+                THEN 2
+
+            -- JPMorgan
+            WHEN cik = 19617
+                AND concept = 'Revenues'
+                THEN 1
+            WHEN cik = 19617
+                AND concept = 'RevenuesNetOfInterestExpense'
+                THEN 2
         END AS concept_priority
 
     FROM main.financial_observations
 
-    WHERE cik = 789019
+    WHERE cik IN (789019, 18230, 19617)
       AND taxonomy = 'us-gaap'
       AND unit = 'USD'
-      AND concept IN (
-          'RevenueFromContractWithCustomerExcludingAssessedTax',
-          'SalesRevenueNet',
-          'Revenues'
-      )
       AND form = '10-K'
       AND start_date IS NOT NULL
       AND date_diff('day', start_date, end_date) BETWEEN 330 AND 380
-
 ),
 
 ranked_observations AS (
-
     SELECT
         *,
         ROW_NUMBER() OVER (
-            PARTITION BY cik, start_date, end_date
+            PARTITION BY cik, end_date
             ORDER BY
                 concept_priority ASC,
                 filed_date DESC,
-                accession DESC
+                accession DESC,
+                start_date DESC
         ) AS observation_rank
 
     FROM revenue_observations
 
+    WHERE concept_priority IS NOT NULL
 )
 
 SELECT
