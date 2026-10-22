@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -25,11 +26,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Python tests
-        run: python -m pytest tests -v
-
       - name: Create CI test database
         run: python scripts/create_ci_db.py
 
       - name: Build and test dbt models
         run: dbt build --project-dir dbt --profiles-dir dbt
+
+      - name: Run Python tests
+        run: python -m pytest tests -v
