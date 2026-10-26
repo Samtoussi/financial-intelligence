@@ -1,7 +1,10 @@
 
 import pytest
 
-from src.analytics.financials import get_annual_financials
+from src.analytics.financials import (
+    get_annual_financials,
+    get_financial_history,
+)
 
 
 @pytest.mark.parametrize(
@@ -50,3 +53,42 @@ def test_unsupported_ticker():
 def test_invalid_year(year):
     with pytest.raises(ValueError, match="fiscal_year"):
         get_annual_financials("MSFT", year)
+
+
+@pytest.mark.parametrize("ticker", ["MSFT", "CAT", "JPM"])
+def test_financial_history_is_sorted(ticker):
+    history = get_financial_history(ticker)
+
+    assert history
+
+    years = [record["fiscal_year"] for record in history]
+
+    assert years == sorted(years)
+    assert len(years) == len(set(years))
+
+
+@pytest.mark.parametrize("ticker", ["MSFT", "CAT", "JPM"])
+def test_financial_history_matches_annual_financials(ticker):
+    history = get_financial_history(ticker)
+
+    assert history
+
+    for record in history:
+        annual = get_annual_financials(
+            ticker,
+            record["fiscal_year"],
+        )
+
+        assert record == annual
+
+
+def test_financial_history_case_insensitive():
+    history = get_financial_history("msft")
+
+    assert history
+    assert all(record["ticker"] == "MSFT" for record in history)
+
+
+def test_financial_history_unsupported_ticker():
+    with pytest.raises(ValueError, match="Unsupported ticker"):
+        get_financial_history("AAPL")

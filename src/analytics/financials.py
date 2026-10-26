@@ -14,6 +14,39 @@ COMPANIES = {
 }
 
 
+def _get_connection():
+    if not DB_PATH.is_file():
+        raise FileNotFoundError(f"DuckDB database not found: {DB_PATH}")
+
+    return duckdb.connect(str(DB_PATH), read_only=True)
+
+
+def _row_to_financial(row: tuple, ticker: str) -> dict:
+    return {
+        "ticker": ticker,
+        "cik": row[0],
+        "fiscal_year": row[1],
+        "period_start": row[2].isoformat(),
+        "period_end": row[3].isoformat(),
+        "revenue_usd": row[4],
+        "previous_year_revenue_usd": row[5],
+        "yoy_growth_pct": row[6],
+        "is_comparable": row[7],
+        "source_concept": row[8],
+        "source_accession": row[9],
+        "source_filed_date": row[10].isoformat(),
+    }
+
+
+def _validate_ticker(ticker: str) -> str:
+    ticker = ticker.upper().strip()
+
+    if ticker not in COMPANIES:
+        raise ValueError(f"Unsupported ticker: {ticker}")
+
+    return ticker
+
+
 def get_annual_financials(
     ticker: str,
     fiscal_year: int,
@@ -25,18 +58,12 @@ def get_annual_financials(
     Never calculates growth outside the Gold model.
     """
 
-    ticker = ticker.upper().strip()
-
-    if ticker not in COMPANIES:
-        raise ValueError(f"Unsupported ticker: {ticker}")
+    ticker = _validate_ticker(ticker)
 
     if not isinstance(fiscal_year, int) or isinstance(fiscal_year, bool):
         raise ValueError("fiscal_year must be an integer")
 
-    if not DB_PATH.is_file():
-        raise FileNotFoundError(f"DuckDB database not found: {DB_PATH}")
-
-    con = duckdb.connect(str(DB_PATH), read_only=True)
+    con = _get_connection()
 
     try:
         row = con.execute(
@@ -69,17 +96,50 @@ def get_annual_financials(
     if row is None:
         return None
 
-    return {
-        "ticker": ticker,
-        "cik": row[0],
-        "fiscal_year": row[1],
-        "period_start": row[2].isoformat(),
-        "period_end": row[3].isoformat(),
-        "revenue_usd": row[4],
-        "previous_year_revenue_usd": row[5],
-        "yoy_growth_pct": row[6],
-        "is_comparable": row[7],
-        "source_concept": row[8],
-        "source_accession": row[9],
-        "source_filed_date": row[10].isoformat(),
-    }
+    return _row_to_financial(row, ticker)
+
+
+def get_financial_history(ticker: str) -> list[dict]:
+    """
+    Retrieve all available annual Gold financial metrics for a company.
+
+    Returns records ordered by fiscal year.
+    Never recalculates revenue growth outside dbt Gold.
+    """
+
+    ticker = _validate_ticker(ticker)
+
+    con = _get_connection()
+
+    try:
+        rows = con.execute(
+            """
+            SELECT
+                r.cik,
+                r.fiscal_year,
+                r.start_date,
+                r.end_date,
+                r.revenue_usd,
+                g.previous_year_revenue_usd,
+                g.yoy_growth_pct,
+                g.is_comparable,
+                r.source_concept,
+                r.source_accession,
+                r.source_filed_date
+            FROM main_gold.annual_revenue AS r
+            JOIN main_gold.annual_revenue_growth AS g
+              ON r.cik = g.cik
+             AND r.fiscal_year = g.fiscal_year
+            WHERE r.cik = ?
+            ORDER BY r.fiscal_year
+            """,
+            [COMPANIES[ticker]],
+        ).fetchall()
+
+    finally:
+        con.close()
+
+    return [
+        _row_to_financial(row, ticker)
+        for row in rows
+    ]
