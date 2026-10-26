@@ -213,3 +213,38 @@ def test_empty_question_rejected():
         match="Question cannot be empty",
     ):
         ask_analyst("   ")
+
+
+@patch("src.ai.analyst.OpenAI")
+@patch("src.ai.analyst.execute_tool")
+def test_final_answer_after_three_tool_rounds(
+    mock_tool,
+    mock_openai,
+):
+    mock_tool.return_value = None
+
+    client = MagicMock()
+    client.responses.create.side_effect = [
+        make_response(
+            output=[make_tool_call()],
+            response_id=f"response_{i}",
+        )
+        for i in range(1, 4)
+    ] + [
+        make_response(
+            output_text="Final answer.",
+            response_id="response_4",
+        )
+    ]
+
+    mock_openai.return_value = client
+
+    result = ask_analyst("Analyze Microsoft")
+
+    assert "unavailable" in result
+    assert client.responses.create.call_count == 4
+
+    final_request = client.responses.create.call_args_list[-1].kwargs
+
+    assert final_request["tool_choice"] == "none"
+    assert final_request["previous_response_id"] == "response_3"
