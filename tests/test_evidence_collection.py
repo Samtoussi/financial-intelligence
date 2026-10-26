@@ -23,19 +23,43 @@ def tool_call(name, arguments, call_id):
     )
 
 
+def financial_result(
+    ticker,
+    revenue,
+    growth,
+    comparable=True,
+):
+    return {
+        "ticker": ticker,
+        "cik": 789019 if ticker == "MSFT" else 18230,
+        "fiscal_year": 2025,
+        "period_start": "2024-01-01",
+        "period_end": "2025-12-31",
+        "revenue_usd": revenue,
+        "previous_year_revenue_usd": None,
+        "yoy_growth_pct": growth,
+        "is_comparable": comparable,
+        "source_concept": (
+            "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ),
+        "source_accession": "test-accession",
+        "source_filed_date": "2026-07-29",
+    }
+
+
 @patch("src.ai.analyst.OpenAI")
 @patch("src.ai.analyst.execute_tool")
 def test_collects_multiple_financial_results(mock_tool, mock_openai):
-    microsoft = {
-        "ticker": "MSFT",
-        "fiscal_year": 2025,
-        "revenue_usd": 281724000000,
-    }
-    caterpillar = {
-        "ticker": "CAT",
-        "fiscal_year": 2025,
-        "revenue_usd": 67589000000,
-    }
+    microsoft = financial_result(
+        "MSFT",
+        281724000000,
+        14.93,
+    )
+    caterpillar = financial_result(
+        "CAT",
+        67589000000,
+        4.29,
+    )
 
     mock_tool.side_effect = [microsoft, caterpillar]
 
@@ -63,6 +87,10 @@ def test_collects_multiple_financial_results(mock_tool, mock_openai):
 
     assert result.answer == "Comparison complete."
     assert result.financial_evidence == [microsoft, caterpillar]
+    assert "Microsoft (MSFT), 2025" in result.financial_summary
+    assert "Caterpillar (CAT), 2025" in result.financial_summary
+    assert "Revenue: $281.724B" in result.financial_summary
+    assert "YoY growth: +14.93%" in result.financial_summary
     assert client.responses.create.call_count == 2
 
 
@@ -89,6 +117,7 @@ def test_missing_data_not_collected(mock_tool, mock_openai):
     result = analyze("Microsoft 2030")
 
     assert result.financial_evidence == []
+    assert result.financial_summary == ""
 
 
 @patch("src.ai.analyst.OpenAI")
@@ -114,6 +143,7 @@ def test_failed_tool_not_collected(mock_tool, mock_openai):
     result = analyze("Microsoft 9999")
 
     assert result.financial_evidence == []
+    assert result.financial_summary == ""
 
 
 @patch("src.ai.analyst.OpenAI")
@@ -145,6 +175,7 @@ def test_document_search_not_collected(mock_tool, mock_openai):
     result = analyze("Microsoft risks")
 
     assert result.financial_evidence == []
+    assert result.financial_summary == ""
 
 
 @patch("src.ai.analyst.analyze")
@@ -152,6 +183,7 @@ def test_existing_interface_preserved(mock_analyze):
     mock_analyze.return_value = SimpleNamespace(
         answer="Original answer",
         financial_evidence=[],
+        financial_summary="",
     )
 
     assert ask_analyst("Question") == "Original answer"

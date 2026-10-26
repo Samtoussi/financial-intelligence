@@ -8,7 +8,7 @@ from openai import OpenAI
 
 from src.analytics.financials import get_annual_financials
 from src.retrieval.search_filings import search_filings
-
+from src.analytics.financial_summary import format_financial_summaries
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -21,6 +21,7 @@ MAX_TOOL_ROUNDS = 3
 class AnalysisResult:
     answer: str
     financial_evidence: list[dict]
+    financial_summary: str = ""
 
 
 TOOLS = [
@@ -242,6 +243,9 @@ def analyze(question: str) -> AnalysisResult:
             return AnalysisResult(
                 answer=response.output_text,
                 financial_evidence=financial_evidence,
+                financial_summary=format_financial_summaries(
+                    financial_evidence
+                ),
             )
 
         print(
