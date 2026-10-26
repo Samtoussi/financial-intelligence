@@ -1,5 +1,6 @@
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -14,6 +15,13 @@ load_dotenv(ROOT / ".env")
 
 MODEL = "gpt-5-mini"
 MAX_TOOL_ROUNDS = 3
+
+
+@dataclass
+class AnalysisResult:
+    answer: str
+    financial_evidence: list[dict]
+
 
 TOOLS = [
     {
@@ -78,6 +86,7 @@ TOOLS = [
         "strict": True,
     },
 ]
+
 
 INSTRUCTIONS = """
 You are a financial analyst using governed SEC-derived data.
@@ -183,11 +192,19 @@ def execute_tool(name: str, arguments: str):
     raise ValueError(f"Unsupported tool: {name}")
 
 
-def ask_analyst(question: str) -> str:
+def analyze(question: str) -> AnalysisResult:
+    """
+    Run the existing AI analyst and collect governed financial
+    evidence from successful financial tool calls.
+
+    Does not validate the model's final free-text answer.
+    """
+
     if not question.strip():
         raise ValueError("Question cannot be empty")
 
     client = OpenAI(timeout=30.0, max_retries=0)
+    financial_evidence = []
 
     response = client.responses.create(
         model=MODEL,
@@ -222,7 +239,10 @@ def ask_analyst(question: str) -> str:
             if not response.output_text:
                 raise RuntimeError("Model returned no answer")
 
-            return response.output_text
+            return AnalysisResult(
+                answer=response.output_text,
+                financial_evidence=financial_evidence,
+            )
 
         print(
             f"\n[TOOL ROUND {round_number + 1}] "
@@ -241,6 +261,15 @@ def ask_analyst(question: str) -> str:
                 )
             except (ValueError, KeyError, TypeError) as exc:
                 result = {"error": str(exc)}
+
+            if (
+                call.name == "get_annual_financials"
+                and isinstance(result, dict)
+                and "error" not in result
+                and result.get("ticker") is not None
+                and result.get("fiscal_year") is not None
+            ):
+                financial_evidence.append(result.copy())
 
             tool_outputs.append(
                 {
@@ -263,6 +292,14 @@ def ask_analyst(question: str) -> str:
     raise RuntimeError(
         "Maximum tool rounds reached without a final answer"
     )
+
+
+def ask_analyst(question: str) -> str:
+    """
+    Preserve the original public interface.
+    """
+
+    return analyze(question).answer
 
 
 if __name__ == "__main__":
