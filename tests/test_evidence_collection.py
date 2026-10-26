@@ -181,9 +181,14 @@ def test_document_search_not_collected(mock_tool, mock_openai):
 @patch("src.ai.analyst.analyze")
 def test_existing_interface_preserved(mock_analyze):
     mock_analyze.return_value = SimpleNamespace(
-        answer="Original answer",
-        financial_evidence=[],
-        financial_summary="",
+        answer="Revenue grew 99%.",
+        financial_evidence=[
+            {"ticker": "MSFT", "fiscal_year": 2025}
+        ],
+        financial_summary="Verified Gold growth: +14.93%",
     )
 
-    assert ask_analyst("Question") == "Original answer"
+    assert (
+        ask_analyst("What was Microsoft's revenue growth?")
+        == "Verified Gold growth: +14.93%"
+    )

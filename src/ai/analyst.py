@@ -299,11 +299,10 @@ def analyze(question: str) -> AnalysisResult:
 
 
 def ask_analyst(question: str) -> str:
-    """
-    Preserve the original public interface.
-    """
+    from src.ai.response_builder import build_user_response
 
-    return analyze(question).answer
+    result = analyze(question)
+    return build_user_response(result).text
 
 
 if __name__ == "__main__":
