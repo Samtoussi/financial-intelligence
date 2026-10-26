@@ -1,6 +1,6 @@
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -25,6 +25,7 @@ class AnalysisResult:
     financial_summary: str = ""
     financial_tool_attempted: bool = False
     financial_evidence_required: bool = False
+    document_evidence: list[dict] = field(default_factory=list)
 
 
 TOOLS = [
@@ -198,9 +199,10 @@ def analyze(question: str) -> AnalysisResult:
     if not question.strip():
         raise ValueError("Question cannot be empty")
 
-    client = OpenAI(timeout=30.0, max_retries=0)
+    client = OpenAI(timeout=90.0, max_retries=0)
 
     financial_evidence = []
+    document_evidence = []
     financial_tool_attempted = False
     financial_evidence_required = requires_financial_evidence(
         question
@@ -247,6 +249,7 @@ def analyze(question: str) -> AnalysisResult:
                 ),
                 financial_tool_attempted=financial_tool_attempted,
                 financial_evidence_required=financial_evidence_required,
+                document_evidence=document_evidence,
             )
 
         print(
@@ -282,6 +285,20 @@ def analyze(question: str) -> AnalysisResult:
             ):
                 financial_evidence.append(result.copy())
 
+            if (
+                call.name == "search_filings"
+                and isinstance(result, list)
+            ):
+                for item in result:
+                    if (
+                        isinstance(item, dict)
+                        and item.get("ticker")
+                        and item.get("chunk_id")
+                        and item.get("source_url")
+                        and item.get("text")
+                    ):
+                        document_evidence.append(item.copy())
+
             tool_outputs.append(
                 {
                     "type": "function_call_output",
@@ -296,12 +313,36 @@ def analyze(question: str) -> AnalysisResult:
             previous_response_id=response.id,
             input=tool_outputs,
             tools=TOOLS,
-            tool_choice="auto",
+            tool_choice=(
+                "none"
+                if round_number == MAX_TOOL_ROUNDS - 1
+                else "auto"
+            ),
             max_output_tokens=3000,
         )
 
-    raise RuntimeError(
-        "Maximum tool rounds reached without a final answer"
+    # The final response is generated after the last tool round.
+    # It must be checked outside the loop, with no further tools allowed.
+    if response.status != "completed":
+        raise RuntimeError(
+            f"Model response incomplete: {response.status}"
+        )
+
+    if any(item.type == "function_call" for item in response.output):
+        raise RuntimeError(
+            "Maximum tool rounds reached without a final answer"
+        )
+
+    if not response.output_text:
+        raise RuntimeError("Model returned no answer")
+
+    return AnalysisResult(
+        answer=response.output_text,
+        financial_evidence=financial_evidence,
+        financial_summary=format_financial_summaries(financial_evidence),
+        financial_tool_attempted=financial_tool_attempted,
+        financial_evidence_required=financial_evidence_required,
+        document_evidence=document_evidence,
     )
 
 

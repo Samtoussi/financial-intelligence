@@ -47,19 +47,21 @@ def financial_result(
     }
 
 
+def document_result(ticker="MSFT", chunk_id="chunk-001"):
+    return {
+        "ticker": ticker,
+        "chunk_id": chunk_id,
+        "item": "Item 1A",
+        "source_url": "https://www.sec.gov/example",
+        "text": "Cybersecurity incidents may disrupt operations.",
+    }
+
+
 @patch("src.ai.analyst.OpenAI")
 @patch("src.ai.analyst.execute_tool")
 def test_collects_multiple_financial_results(mock_tool, mock_openai):
-    microsoft = financial_result(
-        "MSFT",
-        281724000000,
-        14.93,
-    )
-    caterpillar = financial_result(
-        "CAT",
-        67589000000,
-        4.29,
-    )
+    microsoft = financial_result("MSFT", 281724000000, 14.93)
+    caterpillar = financial_result("CAT", 67589000000, 4.29)
 
     mock_tool.side_effect = [microsoft, caterpillar]
 
@@ -87,6 +89,7 @@ def test_collects_multiple_financial_results(mock_tool, mock_openai):
 
     assert result.answer == "Comparison complete."
     assert result.financial_evidence == [microsoft, caterpillar]
+    assert result.document_evidence == []
     assert "Microsoft (MSFT), 2025" in result.financial_summary
     assert "Caterpillar (CAT), 2025" in result.financial_summary
     assert "Revenue: $281.724B" in result.financial_summary
@@ -118,6 +121,7 @@ def test_missing_data_not_collected(mock_tool, mock_openai):
 
     assert result.financial_evidence == []
     assert result.financial_summary == ""
+    assert result.document_evidence == []
 
 
 @patch("src.ai.analyst.OpenAI")
@@ -144,18 +148,14 @@ def test_failed_tool_not_collected(mock_tool, mock_openai):
 
     assert result.financial_evidence == []
     assert result.financial_summary == ""
+    assert result.document_evidence == []
 
 
 @patch("src.ai.analyst.OpenAI")
 @patch("src.ai.analyst.execute_tool")
-def test_document_search_not_collected(mock_tool, mock_openai):
-    mock_tool.return_value = [
-        {
-            "ticker": "MSFT",
-            "chunk_id": "abc",
-            "text": "Risk factors",
-        }
-    ]
+def test_collects_document_evidence(mock_tool, mock_openai):
+    passage = document_result()
+    mock_tool.return_value = [passage]
 
     first = response(
         output=[
@@ -176,6 +176,79 @@ def test_document_search_not_collected(mock_tool, mock_openai):
 
     assert result.financial_evidence == []
     assert result.financial_summary == ""
+    assert result.document_evidence == [passage]
+    assert result.document_evidence[0]["source_url"] == (
+        "https://www.sec.gov/example"
+    )
+
+
+@patch("src.ai.analyst.OpenAI")
+@patch("src.ai.analyst.execute_tool")
+def test_rejects_incomplete_document_evidence(mock_tool, mock_openai):
+    mock_tool.return_value = [
+        {
+            "ticker": "MSFT",
+            "chunk_id": "chunk-001",
+            "text": "Missing source URL.",
+        }
+    ]
+
+    first = response(
+        output=[
+            tool_call(
+                "search_filings",
+                '{"query":"risk","ticker":"MSFT","limit":1}',
+                "call_1",
+            )
+        ]
+    )
+    second = response(answer="Risk analysis.")
+
+    client = MagicMock()
+    client.responses.create.side_effect = [first, second]
+    mock_openai.return_value = client
+
+    result = analyze("Microsoft risks")
+
+    assert result.document_evidence == []
+
+
+@patch("src.ai.analyst.OpenAI")
+@patch("src.ai.analyst.execute_tool")
+def test_collects_financial_and_document_evidence(
+    mock_tool,
+    mock_openai,
+):
+    microsoft = financial_result("MSFT", 281724000000, 14.93)
+    passage = document_result()
+
+    mock_tool.side_effect = [microsoft, [passage]]
+
+    first = response(
+        output=[
+            tool_call(
+                "get_annual_financials",
+                '{"ticker":"MSFT","fiscal_year":2025}',
+                "call_1",
+            ),
+            tool_call(
+                "search_filings",
+                '{"query":"risk","ticker":"MSFT","limit":1}',
+                "call_2",
+            ),
+        ]
+    )
+    second = response(answer="Financial and risk analysis.")
+
+    client = MagicMock()
+    client.responses.create.side_effect = [first, second]
+    mock_openai.return_value = client
+
+    result = analyze("Microsoft revenue and risks")
+
+    assert result.financial_evidence == [microsoft]
+    assert result.document_evidence == [passage]
+    assert "Revenue: $281.724B" in result.financial_summary
 
 
 @patch("src.ai.analyst.analyze")
