@@ -6,10 +6,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from src.ai.financial_intent import requires_financial_evidence
+from src.ai.risk_evidence import RiskClaim
+from src.ai.risk_generator import generate_risk_claims
 from src.analytics.financials import get_annual_financials
 from src.analytics.financial_summary import format_financial_summaries
-from src.ai.financial_intent import requires_financial_evidence
 from src.retrieval.search_filings import search_filings
+
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -26,6 +29,8 @@ class AnalysisResult:
     financial_tool_attempted: bool = False
     financial_evidence_required: bool = False
     document_evidence: list[dict] = field(default_factory=list)
+    risk_claims: list[RiskClaim] = field(default_factory=list)
+    risk_generation_attempted: bool = False
 
 
 TOOLS = [
@@ -195,6 +200,51 @@ def execute_tool(name: str, arguments: str):
     raise ValueError(f"Unsupported tool: {name}")
 
 
+def build_analysis_result(
+    *,
+    answer: str,
+    financial_evidence: list[dict],
+    document_evidence: list[dict],
+    financial_tool_attempted: bool,
+    financial_evidence_required: bool,
+) -> AnalysisResult:
+    """
+    Finalize collected evidence.
+
+    Risk generation is best-effort and must never prevent
+    verified financial results from being returned.
+    """
+
+    financial_summary = format_financial_summaries(
+        financial_evidence
+    )
+
+    risk_claims = []
+    risk_generation_attempted = bool(document_evidence)
+
+    if document_evidence:
+        try:
+            risk_claims = generate_risk_claims(
+                document_evidence
+            )
+        except Exception as exc:
+            print(
+                "[WARN] Risk generation unavailable:",
+                type(exc).__name__,
+            )
+
+    return AnalysisResult(
+        answer=answer,
+        financial_evidence=financial_evidence,
+        financial_summary=financial_summary,
+        financial_tool_attempted=financial_tool_attempted,
+        financial_evidence_required=financial_evidence_required,
+        document_evidence=document_evidence,
+        risk_claims=risk_claims,
+        risk_generation_attempted=risk_generation_attempted,
+    )
+
+
 def analyze(question: str) -> AnalysisResult:
     if not question.strip():
         raise ValueError("Question cannot be empty")
@@ -241,15 +291,12 @@ def analyze(question: str) -> AnalysisResult:
             if not response.output_text:
                 raise RuntimeError("Model returned no answer")
 
-            return AnalysisResult(
+            return build_analysis_result(
                 answer=response.output_text,
                 financial_evidence=financial_evidence,
-                financial_summary=format_financial_summaries(
-                    financial_evidence
-                ),
+                document_evidence=document_evidence,
                 financial_tool_attempted=financial_tool_attempted,
                 financial_evidence_required=financial_evidence_required,
-                document_evidence=document_evidence,
             )
 
         print(
@@ -321,14 +368,16 @@ def analyze(question: str) -> AnalysisResult:
             max_output_tokens=3000,
         )
 
-    # The final response is generated after the last tool round.
-    # It must be checked outside the loop, with no further tools allowed.
+    # Final response after the last permitted tool round.
     if response.status != "completed":
         raise RuntimeError(
             f"Model response incomplete: {response.status}"
         )
 
-    if any(item.type == "function_call" for item in response.output):
+    if any(
+        item.type == "function_call"
+        for item in response.output
+    ):
         raise RuntimeError(
             "Maximum tool rounds reached without a final answer"
         )
@@ -336,13 +385,12 @@ def analyze(question: str) -> AnalysisResult:
     if not response.output_text:
         raise RuntimeError("Model returned no answer")
 
-    return AnalysisResult(
+    return build_analysis_result(
         answer=response.output_text,
         financial_evidence=financial_evidence,
-        financial_summary=format_financial_summaries(financial_evidence),
+        document_evidence=document_evidence,
         financial_tool_attempted=financial_tool_attempted,
         financial_evidence_required=financial_evidence_required,
-        document_evidence=document_evidence,
     )
 
 

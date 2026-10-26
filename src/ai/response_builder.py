@@ -16,16 +16,36 @@ UNAVAILABLE_MESSAGE = (
     "this request. No financial figures are provided."
 )
 
+INSUFFICIENT_RISK_MESSAGE = (
+    "No source-linked risk explanations are available "
+    "from the retrieved SEC excerpts."
+)
+
+
+def format_risk_claims(claims: list) -> str:
+    if not claims:
+        return ""
+
+    sections = []
+
+    for claim in claims:
+        sections.append(
+            f"{claim.ticker}\n"
+            f"{claim.explanation}\n"
+            f"Chunk: {claim.chunk_id}\n"
+            f"Source: {claim.source_url}"
+        )
+
+    return "SEC risk analysis\n\n" + "\n\n".join(sections)
+
 
 def build_user_response(result: AnalysisResult) -> UserResponse:
     """
-    Compose governed financial metrics and SEC excerpts.
+    Compose governed financial metrics and SEC evidence.
 
-    Financial figures come exclusively from Gold.
-    Document excerpts come from retrieved SEC passages.
-    Unverified AI text is not mixed into governed answers.
-
-    Preserve the existing financial-only response format.
+    Gold is authoritative for financial figures.
+    AI risk explanations are source-linked, not
+    independently semantically verified.
     """
 
     financial_evidence = result.financial_evidence
@@ -34,10 +54,27 @@ def build_user_response(result: AnalysisResult) -> UserResponse:
         "document_evidence",
         [],
     )
-
-    document_summary = format_document_summaries(
-        document_evidence
+    risk_claims = getattr(
+        result,
+        "risk_claims",
+        [],
     )
+    risk_generation_attempted = getattr(
+        result,
+        "risk_generation_attempted",
+        False,
+    )
+
+    risk_summary = format_risk_claims(risk_claims)
+
+    if risk_summary:
+        qualitative_section = risk_summary
+    elif risk_generation_attempted and document_evidence:
+        qualitative_section = INSUFFICIENT_RISK_MESSAGE
+    else:
+        qualitative_section = format_document_summaries(
+            document_evidence
+        )
 
     if financial_evidence:
         if not result.financial_summary:
@@ -46,13 +83,13 @@ def build_user_response(result: AnalysisResult) -> UserResponse:
                 "financial summary was generated."
             )
 
-        if document_summary:
+        if qualitative_section:
             return UserResponse(
                 text=(
                     "Financial performance\n\n"
                     + result.financial_summary
                     + "\n\n"
-                    + document_summary
+                    + qualitative_section
                 ),
                 financial_verified=True,
             )
@@ -68,17 +105,17 @@ def build_user_response(result: AnalysisResult) -> UserResponse:
     ):
         parts = [UNAVAILABLE_MESSAGE]
 
-        if document_summary:
-            parts.append(document_summary)
+        if qualitative_section:
+            parts.append(qualitative_section)
 
         return UserResponse(
             text="\n\n".join(parts),
             financial_verified=False,
         )
 
-    if document_summary:
+    if qualitative_section:
         return UserResponse(
-            text=document_summary,
+            text=qualitative_section,
             financial_verified=False,
         )
 
