@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.ai.analyst import ask_analyst
+from src.ai.analyst import analyze, ask_analyst
 
 
 def make_response(
@@ -34,20 +34,36 @@ def make_tool_call():
     )
 
 
+def make_financial_result():
+    return {
+        "ticker": "MSFT",
+        "cik": 789019,
+        "fiscal_year": 2025,
+        "period_start": "2024-07-01",
+        "period_end": "2025-06-30",
+        "revenue_usd": 281724000000,
+        "previous_year_revenue_usd": 245122000000,
+        "yoy_growth_pct": 14.93,
+        "is_comparable": True,
+        "source_concept": (
+            "RevenueFromContractWithCustomerExcludingAssessedTax"
+        ),
+        "source_accession": "0001193125-26-323660",
+        "source_filed_date": "2026-07-29",
+    }
+
+
 @patch("src.ai.analyst.OpenAI")
 @patch("src.ai.analyst.execute_tool")
 def test_successful_tool_flow(mock_tool, mock_openai):
-    mock_tool.return_value = {
-        "ticker": "MSFT",
-        "revenue_usd": 281724000000,
-    }
+    mock_tool.return_value = make_financial_result()
 
     first = make_response(
         output=[make_tool_call()],
     )
 
     second = make_response(
-        output_text="Microsoft revenue was $281.724 billion.",
+        output_text="Microsoft revenue was $999 billion.",
         response_id="response_2",
     )
 
@@ -57,8 +73,13 @@ def test_successful_tool_flow(mock_tool, mock_openai):
 
     result = ask_analyst("What was Microsoft's revenue?")
 
-    assert result == "Microsoft revenue was $281.724 billion."
+    assert "Microsoft (MSFT), 2025" in result
+    assert "Revenue: $281.724B" in result
+    assert "YoY growth: +14.93%" in result
+    assert "$999 billion" not in result
+
     assert client.responses.create.call_count == 2
+
     mock_tool.assert_called_once_with(
         "get_annual_financials",
         '{"ticker":"MSFT","fiscal_year":2025}',
@@ -69,6 +90,63 @@ def test_successful_tool_flow(mock_tool, mock_openai):
     assert second_request["previous_response_id"] == "response_1"
     assert second_request["input"][0]["type"] == "function_call_output"
     assert second_request["input"][0]["call_id"] == "call_1"
+
+
+@patch("src.ai.analyst.OpenAI")
+@patch("src.ai.analyst.execute_tool")
+def test_failed_financial_lookup_blocks_ai_answer(
+    mock_tool,
+    mock_openai,
+):
+    mock_tool.return_value = None
+
+    first = make_response(
+        output=[make_tool_call()],
+    )
+
+    second = make_response(
+        output_text="Microsoft revenue was $999 billion.",
+        response_id="response_2",
+    )
+
+    client = MagicMock()
+    client.responses.create.side_effect = [first, second]
+    mock_openai.return_value = client
+
+    result = ask_analyst("What was Microsoft's revenue?")
+
+    assert "unavailable" in result
+    assert "$999 billion" not in result
+    assert client.responses.create.call_count == 2
+
+
+@patch("src.ai.analyst.OpenAI")
+@patch("src.ai.analyst.execute_tool")
+def test_failed_financial_lookup_sets_attempt_flag(
+    mock_tool,
+    mock_openai,
+):
+    mock_tool.side_effect = ValueError("Invalid fiscal year")
+
+    first = make_response(
+        output=[make_tool_call()],
+    )
+
+    second = make_response(
+        output_text="Financial data unavailable.",
+        response_id="response_2",
+    )
+
+    client = MagicMock()
+    client.responses.create.side_effect = [first, second]
+    mock_openai.return_value = client
+
+    result = analyze("What was Microsoft's revenue?")
+
+    assert result.financial_tool_attempted is True
+    assert result.financial_evidence == []
+    assert result.financial_summary == ""
+    assert client.responses.create.call_count == 2
 
 
 @patch("src.ai.analyst.OpenAI")

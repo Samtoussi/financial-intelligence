@@ -7,8 +7,9 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from src.analytics.financials import get_annual_financials
-from src.retrieval.search_filings import search_filings
 from src.analytics.financial_summary import format_financial_summaries
+from src.ai.financial_intent import requires_financial_evidence
+from src.retrieval.search_filings import search_filings
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env")
@@ -22,6 +23,8 @@ class AnalysisResult:
     answer: str
     financial_evidence: list[dict]
     financial_summary: str = ""
+    financial_tool_attempted: bool = False
+    financial_evidence_required: bool = False
 
 
 TOOLS = [
@@ -41,9 +44,7 @@ TOOLS = [
                     "type": "string",
                     "enum": ["MSFT", "CAT", "JPM"],
                 },
-                "fiscal_year": {
-                    "type": "integer",
-                },
+                "fiscal_year": {"type": "integer"},
             },
             "required": ["ticker", "fiscal_year"],
             "additionalProperties": False,
@@ -194,18 +195,16 @@ def execute_tool(name: str, arguments: str):
 
 
 def analyze(question: str) -> AnalysisResult:
-    """
-    Run the existing AI analyst and collect governed financial
-    evidence from successful financial tool calls.
-
-    Does not validate the model's final free-text answer.
-    """
-
     if not question.strip():
         raise ValueError("Question cannot be empty")
 
     client = OpenAI(timeout=30.0, max_retries=0)
+
     financial_evidence = []
+    financial_tool_attempted = False
+    financial_evidence_required = requires_financial_evidence(
+        question
+    )
 
     response = client.responses.create(
         model=MODEL,
@@ -246,6 +245,8 @@ def analyze(question: str) -> AnalysisResult:
                 financial_summary=format_financial_summaries(
                     financial_evidence
                 ),
+                financial_tool_attempted=financial_tool_attempted,
+                financial_evidence_required=financial_evidence_required,
             )
 
         print(
@@ -256,7 +257,13 @@ def analyze(question: str) -> AnalysisResult:
         tool_outputs = []
 
         for call in calls:
-            print(f"[TOOL CALL] {call.name}: {call.arguments}")
+            print(
+                f"[TOOL CALL] {call.name}: "
+                f"{call.arguments}"
+            )
+
+            if call.name == "get_annual_financials":
+                financial_tool_attempted = True
 
             try:
                 result = execute_tool(
