@@ -1,0 +1,67 @@
+{
+    "version": 1,
+    "cases": [
+        {
+            "id": "financial_msft_2025",
+            "category": "financial_accuracy",
+            "question": "What was Microsoft's revenue and year-over-year revenue growth in fiscal year 2025?",
+            "expected_tickers": [
+                "MSFT"
+            ],
+            "expected_fiscal_year": 2025,
+            "requires_financial_evidence": true,
+            "requires_document_evidence": false,
+            "requires_risk_claims": false
+        },
+        {
+            "id": "financial_comparison_2025",
+            "category": "financial_accuracy",
+            "question": "Compare Microsoft's and Caterpillar's revenue growth in 2025.",
+            "expected_tickers": [
+                "MSFT",
+                "CAT"
+            ],
+            "expected_fiscal_year": 2025,
+            "requires_financial_evidence": true,
+            "requires_document_evidence": false,
+            "requires_risk_claims": false
+        },
+        {
+            "id": "mixed_evidence_2025",
+            "category": "mixed_evidence",
+            "question": "Compare Microsoft's and Caterpillar's revenue growth in 2025 and explain relevant risks from their latest indexed SEC filings. Cite your sources.",
+            "expected_tickers": [
+                "MSFT",
+                "CAT"
+            ],
+            "expected_fiscal_year": 2025,
+            "requires_financial_evidence": true,
+            "requires_document_evidence": true,
+            "requires_risk_claims": true
+        },
+        {
+            "id": "qualitative_msft",
+            "category": "qualitative",
+            "question": "What geopolitical risks does Microsoft discuss in its latest indexed SEC filing?",
+            "expected_tickers": [
+                "MSFT"
+            ],
+            "expected_fiscal_year": null,
+            "requires_financial_evidence": false,
+            "requires_document_evidence": true,
+            "requires_risk_claims": true
+        },
+        {
+            "id": "qualitative_cat",
+            "category": "qualitative",
+            "question": "What supply chain risks does Caterpillar discuss in its latest indexed SEC filing?",
+            "expected_tickers": [
+                "CAT"
+            ],
+            "expected_fiscal_year": null,
+            "requires_financial_evidence": false,
+            "requires_document_evidence": true,
+            "requires_risk_claims": true
+        }
+    ]
+}
