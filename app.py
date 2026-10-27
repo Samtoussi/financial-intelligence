@@ -3,12 +3,9 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from src.ai.dashboard import answer_dashboard_question
+from src.ai.dashboard import DashboardContext, answer_dashboard_question
 from src.analytics.financials import get_financial_history
-from src.analytics.financial_summary import (
-    COMPANY_NAMES,
-    format_usd,
-)
+from src.analytics.financial_summary import COMPANY_NAMES, format_usd
 
 
 st.set_page_config(
@@ -100,6 +97,8 @@ st.caption(
 
 st.divider()
 
+# --- Revenue History ---
+
 st.subheader("Revenue history")
 
 chart_data = pd.DataFrame(
@@ -128,7 +127,10 @@ chart = (
             scale=alt.Scale(zero=False),
         ),
         tooltip=[
-            alt.Tooltip("Fiscal year:O", title="Fiscal year"),
+            alt.Tooltip(
+                "Fiscal year:O",
+                title="Fiscal year",
+            ),
             alt.Tooltip(
                 "Revenue (USD billions):Q",
                 title="Revenue (USD billions)",
@@ -146,27 +148,23 @@ st.altair_chart(
 
 st.divider()
 
+# --- SEC Source ---
+
 st.subheader("SEC source")
 
-st.write(
-    f"**Concept:** {selected['source_concept']}"
-)
-st.write(
-    f"**Accession:** {selected['source_accession']}"
-)
-st.write(
-    f"**Filed:** {selected['source_filed_date']}"
-)
+st.write(f"**Concept:** {selected['source_concept']}")
+st.write(f"**Accession:** {selected['source_accession']}")
+st.write(f"**Filed:** {selected['source_filed_date']}")
 
 st.caption(
     "Financial metrics are sourced from governed dbt Gold models. "
     "Year-over-year growth is not recalculated in the dashboard."
 )
 
-
-# --- AI Analyst Chat ---
+# --- AI Financial Analyst ---
 
 st.divider()
+
 st.subheader("AI Financial Analyst")
 
 st.caption(
@@ -177,8 +175,13 @@ st.caption(
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Render existing conversation history.
+# Each user message retains its original dashboard context.
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
+        if message["role"] == "user" and message.get("context"):
+            st.caption(message["context"])
+
         if message["role"] == "assistant":
             render_analyst_answer(message["content"])
         else:
@@ -189,14 +192,24 @@ question = st.chat_input(
 )
 
 if question:
+    # Capture the selection at the moment the question is asked.
+    context = DashboardContext(
+        ticker=ticker,
+        fiscal_year=fiscal_year,
+    )
+
+    context_label = f"{ticker} · FY{fiscal_year}"
+
     st.session_state.messages.append(
         {
             "role": "user",
             "content": question,
+            "context": context_label,
         }
     )
 
     with st.chat_message("user"):
+        st.caption(context_label)
         st.markdown(question)
 
     with st.chat_message("assistant"):
@@ -204,8 +217,10 @@ if question:
             "Analyzing financial data and SEC filings..."
         ):
             try:
-                answer = answer_dashboard_question(question)
-
+                answer = answer_dashboard_question(
+                    question,
+                    context,
+                )
             except Exception as exc:
                 answer = (
                     "The analysis could not be completed. "
