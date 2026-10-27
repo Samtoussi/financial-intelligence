@@ -12,6 +12,7 @@ from src.ai.risk_generator import generate_risk_claims
 from src.analytics.financials import get_annual_financials
 from src.analytics.financial_summary import format_financial_summaries
 from src.retrieval.search_filings import search_filings
+from src.retrieval.filing_metadata import get_filing_metadata
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -186,16 +187,23 @@ def execute_tool(name: str, arguments: str):
             limit=limit,
         )
 
-        return [
-            {
+        enriched = []
+        for item in results:
+            passage = {
                 "chunk_id": item["chunk_id"],
                 "ticker": item["ticker"],
                 "item": item["item"],
                 "source_url": item["source_url"],
                 "text": item["text"],
             }
-            for item in results
-        ]
+            accession = item.get("accession")
+            if accession:
+                passage["accession"] = accession
+                metadata = get_filing_metadata(accession)
+                if metadata and metadata["ticker"] == item["ticker"]:
+                    passage["filing_metadata"] = metadata
+            enriched.append(passage)
+        return enriched
 
     raise ValueError(f"Unsupported tool: {name}")
 
@@ -207,6 +215,7 @@ def build_analysis_result(
     document_evidence: list[dict],
     financial_tool_attempted: bool,
     financial_evidence_required: bool,
+    question: str = "",
 ) -> AnalysisResult:
     """
     Finalize collected evidence.
@@ -225,12 +234,14 @@ def build_analysis_result(
     if document_evidence:
         try:
             risk_claims = generate_risk_claims(
-                document_evidence
+                document_evidence,
+                question=question,
             )
         except Exception as exc:
             print(
                 "[WARN] Risk generation unavailable:",
                 type(exc).__name__,
+                str(exc),
             )
 
     return AnalysisResult(
@@ -297,6 +308,7 @@ def analyze(question: str) -> AnalysisResult:
                 document_evidence=document_evidence,
                 financial_tool_attempted=financial_tool_attempted,
                 financial_evidence_required=financial_evidence_required,
+                question=question,
             )
 
         print(
@@ -391,6 +403,7 @@ def analyze(question: str) -> AnalysisResult:
         document_evidence=document_evidence,
         financial_tool_attempted=financial_tool_attempted,
         financial_evidence_required=financial_evidence_required,
+        question=question,
     )
 
 

@@ -162,3 +162,36 @@ def test_default_client_configuration(mock_openai):
         timeout=90.0,
         max_retries=0,
     )
+
+
+def test_question_is_passed_to_risk_generator():
+    client = make_client({"claims": []})
+
+    generate_risk_claims(
+        sample_evidence(),
+        client=client,
+        question="What are Microsoft's cybersecurity risks?",
+    )
+
+    request = client.responses.create.call_args.kwargs
+    payload = json.loads(request["input"])
+
+    assert payload["question"] == (
+        "What are Microsoft's cybersecurity risks?"
+    )
+    assert payload["evidence"] == sample_evidence()
+
+
+def test_instructions_require_question_relevance():
+    client = make_client({"claims": []})
+
+    generate_risk_claims(
+        sample_evidence(),
+        client=client,
+        question="What are the cybersecurity risks?",
+    )
+
+    request = client.responses.create.call_args.kwargs
+
+    assert "directly relevant" in request["instructions"]
+    assert "Omit excerpts" in request["instructions"]
