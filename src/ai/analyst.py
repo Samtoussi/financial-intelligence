@@ -32,6 +32,7 @@ class AnalysisResult:
     document_evidence: list[dict] = field(default_factory=list)
     risk_claims: list[RiskClaim] = field(default_factory=list)
     risk_generation_attempted: bool = False
+    risk_generation_failed: bool = False
 
 
 TOOLS = [
@@ -188,6 +189,7 @@ def execute_tool(name: str, arguments: str):
         )
 
         enriched = []
+
         for item in results:
             passage = {
                 "chunk_id": item["chunk_id"],
@@ -196,13 +198,18 @@ def execute_tool(name: str, arguments: str):
                 "source_url": item["source_url"],
                 "text": item["text"],
             }
+
             accession = item.get("accession")
+
             if accession:
                 passage["accession"] = accession
                 metadata = get_filing_metadata(accession)
+
                 if metadata and metadata["ticker"] == item["ticker"]:
                     passage["filing_metadata"] = metadata
+
             enriched.append(passage)
+
         return enriched
 
     raise ValueError(f"Unsupported tool: {name}")
@@ -230,6 +237,7 @@ def build_analysis_result(
 
     risk_claims = []
     risk_generation_attempted = bool(document_evidence)
+    risk_generation_failed = False
 
     if document_evidence:
         try:
@@ -238,6 +246,7 @@ def build_analysis_result(
                 question=question,
             )
         except Exception as exc:
+            risk_generation_failed = True
             print(
                 "[WARN] Risk generation unavailable:",
                 type(exc).__name__,
@@ -253,6 +262,7 @@ def build_analysis_result(
         document_evidence=document_evidence,
         risk_claims=risk_claims,
         risk_generation_attempted=risk_generation_attempted,
+        risk_generation_failed=risk_generation_failed,
     )
 
 
