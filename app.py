@@ -3,6 +3,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from src.ai.dashboard import answer_dashboard_question
 from src.analytics.financials import get_financial_history
 from src.analytics.financial_summary import (
     COMPANY_NAMES,
@@ -16,14 +17,25 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("Financial Intelligence")
-st.caption("SEC financial data · dbt Gold · AI-powered analytics")
-
 
 @st.cache_data(ttl=300)
 def load_financial_history(ticker: str) -> list[dict]:
     return get_financial_history(ticker)
 
+
+def render_analyst_answer(answer: str) -> None:
+    """
+    Render analyst responses with readable line breaks
+    while preserving clickable SEC source links.
+    """
+    for paragraph in answer.split("\n\n"):
+        st.markdown(paragraph.replace("\n", "  \n"))
+
+
+# --- Dashboard ---
+
+st.title("Financial Intelligence")
+st.caption("SEC financial data · dbt Gold · AI-powered analytics")
 
 ticker = st.selectbox(
     "Company",
@@ -150,3 +162,66 @@ st.caption(
     "Financial metrics are sourced from governed dbt Gold models. "
     "Year-over-year growth is not recalculated in the dashboard."
 )
+
+
+# --- AI Analyst Chat ---
+
+st.divider()
+st.subheader("AI Financial Analyst")
+
+st.caption(
+    "Ask questions about company financials and SEC filings. "
+    "Answers use governed financial data and source-linked evidence."
+)
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        if message["role"] == "assistant":
+            render_analyst_answer(message["content"])
+        else:
+            st.markdown(message["content"])
+
+question = st.chat_input(
+    "Ask about revenue, growth, or SEC risks..."
+)
+
+if question:
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": question,
+        }
+    )
+
+    with st.chat_message("user"):
+        st.markdown(question)
+
+    with st.chat_message("assistant"):
+        with st.spinner(
+            "Analyzing financial data and SEC filings..."
+        ):
+            try:
+                answer = answer_dashboard_question(question)
+
+            except Exception as exc:
+                answer = (
+                    "The analysis could not be completed. "
+                    "Please try again."
+                )
+                print(
+                    "[ERROR] AI analysis failed:",
+                    type(exc).__name__,
+                    str(exc),
+                )
+
+        render_analyst_answer(answer)
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": answer,
+        }
+    )
