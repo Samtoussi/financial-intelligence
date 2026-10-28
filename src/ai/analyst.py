@@ -1,16 +1,17 @@
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.ai.financial_intent import requires_financial_evidence
+from src.ai.financial_intent import requires_financial_evidence, requires_filing_evidence
 from src.ai.risk_evidence import RiskClaim
 from src.ai.risk_generator import generate_risk_claims
 from src.analytics.financials import get_annual_financials
-from src.analytics.financial_summary import format_financial_summaries
+from src.analytics.financial_summary import COMPANY_NAMES, format_financial_summaries
 from src.retrieval.search_filings import search_filings
 from src.retrieval.filing_metadata import get_filing_metadata
 
@@ -33,6 +34,8 @@ class AnalysisResult:
     risk_claims: list[RiskClaim] = field(default_factory=list)
     risk_generation_attempted: bool = False
     risk_generation_failed: bool = False
+    filing_evidence_required: bool = False
+    filing_search_attempted: bool = False
 
 
 TOOLS = [
@@ -215,6 +218,23 @@ def execute_tool(name: str, arguments: str):
     raise ValueError(f"Unsupported tool: {name}")
 
 
+def _document_passages(result) -> list[dict]:
+    if not isinstance(result, list):
+        return []
+    return [item.copy() for item in result if isinstance(item, dict) and all(
+        isinstance(item.get(key), str) and item[key].strip()
+        for key in ("ticker", "chunk_id", "source_url", "text")
+    )]
+
+
+def _filing_targets(question: str, context_ticker: str | None) -> list[str]:
+    # Only the three supported companies; explicit names override the selection.
+    named = [ticker for ticker, name in COMPANY_NAMES.items() if re.search(
+        rf"\b(?:{re.escape(ticker)}|{re.escape(name.split()[0])})\b", question, re.IGNORECASE,
+    )]
+    return named or ([context_ticker] if context_ticker in COMPANY_NAMES else [])
+
+
 def build_analysis_result(
     *,
     answer: str,
@@ -223,6 +243,10 @@ def build_analysis_result(
     financial_tool_attempted: bool,
     financial_evidence_required: bool,
     question: str = "",
+    filing_evidence_required: bool = False,
+    filing_search_attempted: bool = False,
+    context_ticker: str | None = None,
+    user_question: str | None = None,
 ) -> AnalysisResult:
     """
     Finalize collected evidence.
@@ -230,6 +254,18 @@ def build_analysis_result(
     Risk generation is best-effort and must never prevent
     verified financial results from being returned.
     """
+
+    if filing_evidence_required and not filing_search_attempted:
+        document_evidence = list(document_evidence)
+        for ticker in _filing_targets(question if user_question is None else user_question, context_ticker):
+            filing_search_attempted = True
+            try:
+                passages = execute_tool("search_filings", json.dumps({
+                    "query": "risk factors", "ticker": ticker, "limit": 3,
+                }))
+                document_evidence.extend(_document_passages(passages))
+            except Exception as exc:
+                print("[WARN] Required filing search unavailable:", type(exc).__name__, str(exc))
 
     financial_summary = format_financial_summaries(
         financial_evidence
@@ -263,10 +299,14 @@ def build_analysis_result(
         risk_claims=risk_claims,
         risk_generation_attempted=risk_generation_attempted,
         risk_generation_failed=risk_generation_failed,
+        filing_evidence_required=filing_evidence_required,
+        filing_search_attempted=filing_search_attempted,
     )
 
 
-def analyze(question: str) -> AnalysisResult:
+def analyze(
+    question: str, *, user_question: str | None = None, context_ticker: str | None = None,
+) -> AnalysisResult:
     if not question.strip():
         raise ValueError("Question cannot be empty")
 
@@ -275,8 +315,11 @@ def analyze(question: str) -> AnalysisResult:
     financial_evidence = []
     document_evidence = []
     financial_tool_attempted = False
+    original_question = question if user_question is None else user_question
+    filing_evidence_required = requires_filing_evidence(original_question)
+    filing_search_attempted = False
     financial_evidence_required = requires_financial_evidence(
-        question
+        original_question
     )
 
     response = client.responses.create(
@@ -319,6 +362,10 @@ def analyze(question: str) -> AnalysisResult:
                 financial_tool_attempted=financial_tool_attempted,
                 financial_evidence_required=financial_evidence_required,
                 question=question,
+                filing_evidence_required=filing_evidence_required,
+                filing_search_attempted=filing_search_attempted,
+                context_ticker=context_ticker,
+                user_question=original_question,
             )
 
         print(
@@ -344,6 +391,11 @@ def analyze(question: str) -> AnalysisResult:
                 )
             except (ValueError, KeyError, TypeError) as exc:
                 result = {"error": str(exc)}
+            except Exception as exc:
+                if call.name != "search_filings":
+                    raise
+                filing_search_attempted = True
+                result = {"error": str(exc)}
 
             if (
                 call.name == "get_annual_financials"
@@ -354,19 +406,9 @@ def analyze(question: str) -> AnalysisResult:
             ):
                 financial_evidence.append(result.copy())
 
-            if (
-                call.name == "search_filings"
-                and isinstance(result, list)
-            ):
-                for item in result:
-                    if (
-                        isinstance(item, dict)
-                        and item.get("ticker")
-                        and item.get("chunk_id")
-                        and item.get("source_url")
-                        and item.get("text")
-                    ):
-                        document_evidence.append(item.copy())
+            if call.name == "search_filings" and isinstance(result, list):
+                filing_search_attempted = True
+                document_evidence.extend(_document_passages(result))
 
             tool_outputs.append(
                 {
@@ -414,6 +456,10 @@ def analyze(question: str) -> AnalysisResult:
         financial_tool_attempted=financial_tool_attempted,
         financial_evidence_required=financial_evidence_required,
         question=question,
+        filing_evidence_required=filing_evidence_required,
+        filing_search_attempted=filing_search_attempted,
+        context_ticker=context_ticker,
+        user_question=original_question,
     )
 
 

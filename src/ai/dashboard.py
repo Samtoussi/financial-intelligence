@@ -65,7 +65,10 @@ def answer_dashboard_question(
         else question
     )
 
-    result = analyze(effective_question)
+    result = (
+        analyze(effective_question, user_question=question, context_ticker=context.ticker)
+        if context is not None else analyze(question)
+    )
     response = build_user_response(result)
 
     return response.text

@@ -26,3 +26,11 @@ def requires_financial_evidence(question: str) -> bool:
         re.search(pattern, normalized)
         for pattern in FINANCIAL_PATTERNS
     )
+
+
+def requires_filing_evidence(question: str) -> bool:
+    """Cover explicit risk/filing requests, not general business questions."""
+    return bool(re.search(
+        r"\brisks?\b|\bfilings?\b|\b10[- ]?k\b|\bannual reports?\b",
+        question, re.IGNORECASE,
+    ))

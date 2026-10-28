@@ -26,6 +26,13 @@ RISK_GENERATION_ERROR_MESSAGE = (
     "could not be completed. Please try again."
 )
 
+MISSING_RISK_EVIDENCE_MESSAGE = (
+    "The requested SEC risk analysis could not be supported: no usable filing "
+    "evidence was retrieved. Any financial figures shown are separate context, "
+    "not evidence for the requested risks. Please specify a supported company "
+    "or check the locally indexed filings."
+)
+
 
 def format_risk_claims(
     claims: list,
@@ -136,7 +143,9 @@ def build_user_response(result: AnalysisResult) -> UserResponse:
         qualitative_section = RISK_GENERATION_ERROR_MESSAGE
     elif risk_summary:
         qualitative_section = risk_summary
-    elif risk_generation_attempted and document_evidence:
+    elif getattr(result, "filing_evidence_required", False) and not document_evidence:
+        qualitative_section = MISSING_RISK_EVIDENCE_MESSAGE
+    elif (risk_generation_attempted or getattr(result, "filing_evidence_required", False)) and document_evidence:
         qualitative_section = INSUFFICIENT_RISK_MESSAGE
     else:
         qualitative_section = format_document_summaries(
