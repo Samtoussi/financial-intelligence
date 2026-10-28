@@ -32,3 +32,8 @@ dbt/dbt_packages/dbt/.user.yml
 dbt/.user.yml
 
 evals/reports/
+
+# Private Valentin branding assets
+/assets/valentin_logo.png
+/assets/valentin_avatar.png
+/assets/valentin_thinking.html

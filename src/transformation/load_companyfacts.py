@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import argparse
 import hashlib
 import json
@@ -168,7 +171,34 @@ def write_parquet(rows, ticker, snapshot_id):
                 row[column] = date.fromisoformat(row[column])
 
     table = pa.Table.from_pylist(rows, schema=schema)
-    pq.write_table(table, output_path, compression="zstd")
+
+    temp_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=output_dir,
+            prefix=".companyfacts_",
+            suffix=".parquet",
+            delete=False,
+        ) as temp:
+            temp_path = Path(temp.name)
+
+        pq.write_table(
+            table,
+            temp_path,
+            compression="zstd",
+        )
+
+        verified = pq.read_table(temp_path)
+
+        if verified.num_rows != len(rows):
+            raise ValueError("Parquet verification failed")
+
+        os.replace(temp_path, output_path)
+
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
     return output_path
 
