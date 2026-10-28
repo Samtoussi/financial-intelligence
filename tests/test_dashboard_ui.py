@@ -5,11 +5,27 @@ import pandas as pd
 import pyarrow as pa
 import pytest
 import streamlit as st
+from PIL import Image
 from streamlit.testing.v1 import AppTest
+from src.ui import analyst
 
 
 @pytest.fixture
-def dashboard(request):
+def branding(request, tmp_path, monkeypatch):
+    avatar_present, animation_present = getattr(request, "param", (False, False))
+    avatar = tmp_path / "avatar.png"
+    animation = tmp_path / "thinking.html"
+    if avatar_present:
+        Image.new("RGBA", (2, 2), (128, 128, 128, 255)).save(avatar)
+    if animation_present:
+        animation.write_text("<span>Test loading indicator</span>", encoding="utf-8")
+    monkeypatch.setattr(analyst, "ANALYST_AVATAR", str(avatar))
+    monkeypatch.setattr(analyst, "THINKING_ART", animation)
+    return avatar_present, animation_present
+
+
+@pytest.fixture
+def dashboard(request, branding):
     rows = [
         dict(cik=789019, fiscal_year=year, revenue_usd=revenue,
              yoy_growth_pct=growth, is_comparable=comparable,
@@ -138,7 +154,7 @@ def test_long_answer_keeps_input_outside_conversation(dashboard):
     assert len(conversation.get("chat_message")) == 2
 
 
-def test_only_new_answers_reveal_progressively_and_use_custom_avatar(dashboard):
+def test_only_new_answers_reveal_progressively_and_use_resolved_avatar(dashboard):
     dashboard.button[0].click().run()
     answer = "SEC risk analysis\n\nMSFT\n\n1. Competition may affect demand.\nChunk: chunk-1\nSource: https://www.sec.gov/filing.htm"
     with patch("src.ai.dashboard.answer_dashboard_question", return_value=answer):
@@ -148,7 +164,7 @@ def test_only_new_answers_reveal_progressively_and_use_custom_avatar(dashboard):
     assert not dashboard.exception
     assert dashboard.session_state.messages[-1]["content"] == answer
     assert any(answer == code.value for code in dashboard.code)
-    assert dashboard.chat_message[1].proto.avatar_type != dashboard.chat_message[0].proto.avatar_type
+    assert dashboard.chat_message[1].proto.avatar != dashboard.chat_message[0].proto.avatar
     with patch("src.ui.analyst.pause") as sleep:
         dashboard.selectbox[1].select(2024).run()
         sleep.assert_not_called()
@@ -156,3 +172,27 @@ def test_only_new_answers_reveal_progressively_and_use_custom_avatar(dashboard):
     assert dashboard.session_state.messages[-1]["context"] == "MSFT · FY2025"
     assert not any(element.type == "html" and "Analyzing" in element.proto.body
                    for element in dashboard)
+
+
+@pytest.mark.parametrize("branding", [(False, False), (True, True), (True, False), (False, True)], indirect=True)
+def test_optional_branding_preserves_answers_history_and_errors(dashboard, branding):
+    dashboard.button[0].click().run()
+    answer = "SEC risk analysis\n\nMSFT\n\n1. Competition may affect demand.\nChunk: test-chunk\nSource: https://www.sec.gov/filing.htm"
+    with patch("src.ai.dashboard.answer_dashboard_question", return_value=answer):
+        dashboard.chat_input[0].set_value("Explain risks").run()
+    assert not dashboard.exception
+    assert dashboard.session_state.messages[-1]["content"] == answer
+    assert any("[SEC filing 1](https://www.sec.gov/filing.htm)" in item.value for item in dashboard.markdown)
+    avatar = dashboard.chat_message[1].proto
+    if branding[0]:
+        assert avatar.AvatarType.Name(avatar.avatar_type) == "IMAGE"
+    else:
+        assert avatar.avatar == ":material/smart_toy:"
+    dashboard.selectbox[1].select(2024).run()
+    assert not dashboard.exception
+    assert dashboard.session_state.messages[-1]["context"] == "MSFT · FY2025"
+    assert dashboard.chat_message[1].proto.avatar_type == avatar.avatar_type
+    with patch("src.ai.dashboard.answer_dashboard_question", side_effect=RuntimeError("Unavailable")):
+        dashboard.chat_input[0].set_value("Try again").run()
+    assert not dashboard.exception
+    assert "Please try again" in dashboard.session_state.messages[-1]["content"]

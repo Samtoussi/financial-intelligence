@@ -1,11 +1,10 @@
 from unittest.mock import patch
-import hashlib
-
-from PIL import Image
+import pytest
 
 from src.ai.response_builder import format_risk_claims
 from src.ai.risk_evidence import RiskClaim
-from src.ui.analyst import ANALYST_AVATAR, ASSETS, present_answer, progressive_chunks
+from src.ui import analyst
+from src.ui.analyst import present_answer, progressive_chunks
 
 
 def test_risk_presentation_preserves_claims_and_source_mapping():
@@ -64,29 +63,38 @@ def test_progressive_chunks_preserve_text_and_atomic_citations():
     assert sleep.call_count <= 60
 
 
-def test_animation_is_self_contained_and_respects_reduced_motion():
-    html = (ASSETS / "valentin_thinking.html").read_text(encoding="utf-8")
-    assert "@keyframes fi-valentin-particle" in html
-    assert "prefers-reduced-motion:reduce" in html
-    assert "<script" not in html
-    assert "http" not in html
-    assert "data-testid" not in html
-    assert "<svg" not in html  # Streamlit's HTML sanitizer removes inline SVG.
-    assert html.count('<span class="fi-particle') == 37
-    assert 'role="status"' in html
-    assert (ASSETS / "valentin_logo.png").read_bytes().startswith(b"\x89PNG")
-    assert "width:26px; height:26px" in html
-    assert "gap:8px; min-height:26px" in html
+@pytest.mark.parametrize("present", [False, True])
+def test_avatar_uses_optional_local_file(tmp_path, monkeypatch, present):
+    avatar = tmp_path / "avatar.png"
+    monkeypatch.setattr(analyst, "ANALYST_AVATAR", str(avatar))
+    if present:
+        avatar.touch()
+    assert analyst.get_analyst_avatar() == (str(avatar) if present else ":material/smart_toy:")
 
 
-def test_avatar_has_transparency_and_original_logo_is_unchanged():
-    assert ANALYST_AVATAR == str(ASSETS / "valentin_avatar.png")
-    with Image.open(ANALYST_AVATAR) as image:
-        assert image.mode == "RGBA"
-        alpha = image.getchannel("A")
-        assert alpha.getextrema() == (0, 255)
-        assert image.getpixel((0, 0))[3] == 0
-        assert sum(alpha.histogram()[1:255]) > 0  # Soft edges/glow, not a binary cutout.
-    assert hashlib.sha256((ASSETS / "valentin_logo.png").read_bytes()).hexdigest() == (
-        "a2731bdd611cabe73a5b7fbb63c738339cec8dd8433f435e7359d4cbd2c75a04"
-    )
+@pytest.mark.parametrize("present", [False, True])
+@pytest.mark.parametrize("fails", [False, True])
+def test_loading_uses_optional_html_or_spinner_and_cleans_up(tmp_path, monkeypatch, present, fails):
+    animation = tmp_path / "thinking.html"
+    monkeypatch.setattr(analyst, "THINKING_ART", animation)
+    if present:
+        animation.write_text("<span>Test loading indicator</span>", encoding="utf-8")
+    with patch.object(analyst.st, "empty") as empty, patch.object(analyst.st, "spinner") as spinner:
+        def run():
+            with analyst.analyst_loading():
+                if fails:
+                    raise RuntimeError("Analysis failed")
+        if fails:
+            with pytest.raises(RuntimeError, match="Analysis failed"):
+                run()
+        else:
+            run()
+        if present:
+            empty.return_value.html.assert_called_once_with(animation)
+            empty.return_value.empty.assert_called_once()
+            spinner.assert_not_called()
+        else:
+            empty.assert_not_called()
+            spinner.assert_called_once_with("Analyzing financial data and SEC filings…")
+            spinner.return_value.__enter__.assert_called_once()
+            spinner.return_value.__exit__.assert_called_once()

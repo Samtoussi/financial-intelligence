@@ -1,6 +1,7 @@
 """Present completed, governed analyst text without generating new claims."""
 
 from pathlib import Path
+from contextlib import contextmanager
 import re
 from time import sleep as pause
 from urllib.parse import urlsplit
@@ -11,6 +12,25 @@ import streamlit as st
 ASSETS = Path(__file__).resolve().parents[2] / "assets"
 ANALYST_AVATAR = str(ASSETS / "valentin_avatar.png")
 THINKING_ART = ASSETS / "valentin_thinking.html"
+
+
+def get_analyst_avatar() -> str:
+    return ANALYST_AVATAR if Path(ANALYST_AVATAR).is_file() else ":material/smart_toy:"
+
+
+@contextmanager
+def analyst_loading():
+    """Use optional local branding, otherwise Streamlit's native spinner."""
+    if not THINKING_ART.is_file():
+        with st.spinner("Analyzing financial data and SEC filings…"):
+            yield
+        return
+    thinking = st.empty()
+    try:
+        thinking.html(THINKING_ART)
+        yield
+    finally:
+        thinking.empty()
 
 
 def present_answer(answer: str) -> tuple[str, bool]:

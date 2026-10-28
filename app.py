@@ -5,7 +5,7 @@ import streamlit as st
 from src.ai.dashboard import DashboardContext, answer_dashboard_question
 from src.analytics.financials import get_financial_history
 from src.analytics.financial_summary import COMPANY_NAMES, format_usd
-from src.ui.analyst import ANALYST_AVATAR, THINKING_ART, render_answer
+from src.ui.analyst import analyst_loading, get_analyst_avatar, render_answer
 
 BLUE = "#60A5FA"
 POSITIVE = "#6BBF9A"
@@ -72,7 +72,7 @@ def render_analyst(ticker: str, fiscal_year: int) -> None:
                 st.markdown("**What would you like to understand?**")
                 st.caption("Ask about revenue, year-over-year growth, or risks disclosed in SEC filings.")
             for message in st.session_state.messages:
-                avatar = ANALYST_AVATAR if message["role"] == "assistant" else ":material/person:"
+                avatar = get_analyst_avatar() if message["role"] == "assistant" else ":material/person:"
                 with st.chat_message(message["role"], avatar=avatar):
                     if message.get("context"):
                         st.caption(message["context"])
@@ -92,19 +92,16 @@ def render_analyst(ticker: str, fiscal_year: int) -> None:
                 with st.chat_message("user", avatar=":material/person:"):
                     st.caption(context_label)
                     st.markdown(question)
-                with st.chat_message("assistant", avatar=ANALYST_AVATAR):
+                with st.chat_message("assistant", avatar=get_analyst_avatar()):
                     st.caption(context_label)
-                    thinking = st.empty()
-                    thinking.html(THINKING_ART)
                     succeeded = False
-                    try:
-                        answer = answer_dashboard_question(question, context)
-                        succeeded = True
-                    except Exception as exc:
-                        answer = "The analysis could not be completed. Please try again."
-                        print("[ERROR] AI analysis failed:", type(exc).__name__, str(exc))
-                    finally:
-                        thinking.empty()
+                    with analyst_loading():
+                        try:
+                            answer = answer_dashboard_question(question, context)
+                            succeeded = True
+                        except Exception as exc:
+                            answer = "The analysis could not be completed. Please try again."
+                            print("[ERROR] AI analysis failed:", type(exc).__name__, str(exc))
                     # Store the completed governed answer before revealing it, so
                     # a rerun cannot lose it or replay its progressive rendering.
                     st.session_state.messages.append(
