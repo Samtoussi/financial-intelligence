@@ -1,777 +1,201 @@
+﻿# Financial Intelligence
 
-# Financial Intelligence
+Financial Intelligence is a local financial analytics platform that transforms SEC filings and structured financial data into traceable insights through Python data pipelines, DuckDB, dbt, and evidence-aware AI analysis. Two independent ingestion pipelines process SEC EDGAR CompanyFacts and 10-K filings, bringing governed financial metrics and cited filing evidence together in an interactive Streamlit application.
 
-**A traceable financial data engineering platform built on SEC EDGAR, Python, DuckDB, dbt, and document retrieval — laying the foundation for evidence-grounded AI financial research.**
+The engineering focus is preserving source data, controlling snapshot replacement, producing comparable annual metrics, and making analysis traceable to its inputs.
 
-> **Current milestone: V2 — Document Intelligence (locally verified; release pending)**
+## Demo
 
-## Overview
+![Financial Intelligence dashboard and AI Analyst demo](assets/demo.gif)
 
-Financial research requires more than retrieving the latest reported numbers.
+[Open the demo at full size](assets/demo.gif).
 
-Companies use different accounting concepts, historical financial values can change in subsequent filings, and important business context often exists in narrative disclosures rather than structured tables.
+## Key capabilities
 
-Financial Intelligence explores these challenges by building a financial data platform that combines structured financial observations with searchable SEC filings.
+- **Financial ingestion:** validate CompanyFacts responses, preserve raw snapshots with SHA-256 metadata, and manage the active snapshot for each company.
+- **Analytical storage:** normalize filing-level observations into Parquet and a persistent DuckDB warehouse; build annual revenue and YoY growth with dbt.
+- **Comparable metrics:** select company-specific revenue concepts, deduplicate annual observations, and flag unsupported year-over-year comparisons.
+- **Document processing:** discover the latest available 10-K, extract Item 1A (Risk Factors) and Item 7 (MD&A), and create deterministic chunks with source provenance.
+- **SEC retrieval:** search Parquet excerpts with whole-word lexical matching, phrase bonuses, ticker filtering, and deterministic ranking.
+- **Evidence-aware analysis:** use Gold metrics for financial figures and retrieved SEC passages for qualitative analysis, with required evidence checks, explicit missing-evidence responses, and clickable filing citations.
+- **Interactive workspace:** explore revenue history and growth in Streamlit, then ask questions using the selected company and fiscal year as context.
 
-The project is developed incrementally:
+### Financial dashboard
 
-- **V1 — Data Foundation:** Ingest, preserve, transform, and validate structured financial data.
-- **V2 — Document Intelligence:** Process SEC annual reports and make their contents searchable.
-- **V3 — AI Assistant:** Combine structured metrics and filing evidence to answer financial questions.
-- **V4 — Product & Operations:** Explore an interactive product and operational improvements.
+![Revenue metrics, growth charts, and financial history](assets/dashboard.png)
 
-The platform currently runs locally without managed cloud infrastructure.
+### Contextual AI Analyst
+
+![Financial dashboard with contextual AI Analyst workspace](assets/ai_analyst.png)
 
 ## Architecture
 
-Financial Intelligence consists of two independent data pipelines.
+![Financial Intelligence architecture: financial and filing pipelines feeding the dashboard and AI Analyst](assets/architecture.png)
 
-```text
-                         SEC EDGAR
-                             |
-               +-------------+-------------+
-               |                           |
-         CompanyFacts API             10-K Filings
-               |                           |
-         Python Ingestion             HTML Ingestion
-               |                           |
-               v                           v
-         BRONZE — JSON               BRONZE — HTML
-         Raw Snapshots               Raw Snapshots
-         SHA-256 Metadata            SHA-256 Metadata
-               |                           |
-               v                           v
-         SILVER — Data               Document Parsing
-         Normalization               Item 1A / Item 7
-         Parquet + DuckDB                  |
-               |                           v
-               v                     Structured Sections
-         GOLD — Analytics            Parquet + SHA-256
-         dbt Models                        |
-         Annual Revenue                    v
-         YoY Growth                  Document Chunking
-               |                     Source Offsets
-               v                           |
-         Data Quality                      v
-         pytest + dbt Tests          Parquet Chunks
-                                           |
-                                           v
-                                     Lexical Retrieval
-                                     Search CLI
-```
+[Full-resolution architecture](assets/architecture.png) · [Editable SVG](assets/architecture.svg)
 
-The pipelines are intentionally separate.
+**Financial pipeline:** SEC CompanyFacts → raw JSON snapshots → normalized Parquet → persistent DuckDB observations → dbt Gold tables (`main_gold.annual_revenue` and `main_gold.annual_revenue_growth`). The dashboard and financial analysis tools read these Gold tables from `data/warehouse/financial_intelligence.duckdb`.
 
-The CompanyFacts pipeline processes structured financial observations, while the document pipeline processes narrative disclosures.
+**Filing pipeline:** SEC submissions and 10-K HTML → raw snapshots → extracted sections → Parquet chunks → lexical retrieval. Retrieval reads the Parquet files through an **in-memory DuckDB connection**, then ranks passages in Python. Filing evidence does not pass through dbt or the persistent financial warehouse.
 
-Both provide foundations for future evidence-grounded financial analysis.
+The paths meet in the application layer. The AI Analyst can request structured financial metrics and filing excerpts through separate tools. The **OpenAI Responses API is an external service** used for AI inference; ingestion, storage, dbt transformations, and lexical retrieval run locally.
 
-## Data Sources
-
-The platform uses public [SEC EDGAR data](https://www.sec.gov/edgar/sec-api-documentation).
-
-Three companies are currently configured:
-
-| Company | Ticker | CIK |
-|---|---|---:|
-| Microsoft | MSFT | 789019 |
-| JPMorgan Chase | JPM | 19617 |
-| Caterpillar | CAT | 18230 |
-
-These companies were selected to explore different financial reporting characteristics, accounting concepts, and document structures.
-
----
-
-# V2 — Document Intelligence
-
-V2 extends Financial Intelligence beyond structured financial observations.
-
-The objective is to retrieve, preserve, process, and search narrative information from SEC annual reports while maintaining traceability to the original source.
-
-## 1. Bronze — SEC Filing Ingestion
-
-The document pipeline discovers the latest available 10-K filing for a configured company using SEC submissions data.
-
-It then downloads the primary filing document and preserves the original HTML response.
-
-Raw filings are stored under:
-
-```text
-data/raw/sec/filings/<TICKER>/<ACCESSION>/
-```
-
-Each snapshot includes:
-
-- Original HTML document
-- Company ticker and CIK
-- Filing accession number
-- Filing and report dates
-- SEC source URL
-- Retrieval timestamp
-- SHA-256 content hash
-- File size
-
-Snapshots use timestamped filenames and content-hash identifiers.
-
-Preserving the original documents makes it possible to investigate extraction results against the exact source that was processed.
-
-## 2. Silver — Document Parsing and Storage
-
-The pipeline extracts two sections from each 10-K filing.
-
-### Item 1A — Risk Factors
-
-Contains disclosures about risks that may affect the company's operations, financial condition, or future performance.
-
-### Item 7 — Management's Discussion and Analysis
-
-Contains management's discussion of financial results, operating performance, and financial condition.
-
-### Extraction Strategy
-
-SEC filings do not follow one universal HTML structure.
-
-The parser identifies section boundaries, extracts the relevant text, and normalizes whitespace.
-
-It supports:
-
-- Direct section extraction
-- A referenced MD&A layout
-- Section-length validation
-- Extraction metadata
-- Text integrity checks
-
-JPMorgan Chase's 10-K presented a notable challenge: its Item 7 heading referenced MD&A content located elsewhere in the document.
-
-The parser handles this supported layout rather than assuming that all content appears immediately after the Item 7 heading.
-
-### Structured Storage
-
-Extracted sections are stored as Parquet:
-
-```text
-data/processed/filings/<TICKER>/<ACCESSION>/sections.parquet
-```
-
-Each section retains:
-
-- Ticker and CIK
-- Filing accession number
-- Filing and report dates
-- SEC source URL
-- Item number
-- Extraction method
-- Normalized text
-- Character and word counts
-- SHA-256 text hash
-
-Parquet files are written to temporary files, verified, and atomically moved into place.
-
-This reduces the risk of publishing incomplete processed output.
-
-## 3. Document Chunking
-
-Long filing sections are divided into smaller text segments for retrieval.
-
-The chunking implementation:
-
-- Targets approximately 300 words per chunk
-- Enforces a maximum of 350 words
-- Prefers sentence boundaries
-- Falls back to word boundaries when necessary
-- Preserves character offsets
-- Generates deterministic chunk identifiers
-
-Chunks retain source metadata, including ticker, accession number, Item number, source URL, and section hash.
-
-Processed chunks are stored under:
-
-```text
-data/processed/filing_chunks/<TICKER>/chunks.parquet
-```
-
-### Text Integrity
-
-Chunking is tested for exact reconstruction.
-
-When the chunks are combined using their recorded positions, they reproduce the original normalized section text.
-
-This verifies that the chunking process does not silently discard or alter document content.
-
-## 4. Lexical Retrieval
-
-V2 introduces a local retrieval system for searching processed SEC filings.
-
-The retrieval implementation uses DuckDB to read Parquet chunks and Python-based lexical ranking.
-
-Supported functionality includes:
-
-- Query tokenization
-- Case-insensitive matching
-- Whole-word matching
-- Requirement that all query terms appear
-- Exact-phrase scoring bonus
-- Term-frequency-based scoring
-- Optional ticker filtering
-- Deterministic result ordering
-
-Example:
-
-```bash
-python -m src.retrieval.search_filings "interest rate risk" --limit 5
-```
-
-Search a specific company:
-
-```bash
-python -m src.retrieval.search_filings "cloud revenue" --ticker MSFT --limit 5
-```
-
-Results include source metadata and document text so retrieved evidence can be traced back to the relevant filing.
-
-### Retrieval Evaluation
-
-An initial retrieval baseline was created using representative financial queries:
-
-- Interest rate risk
-- Cloud revenue
-- Credit losses
-- Supply chain
-- Foreign exchange
-
-Evaluation output is stored locally at:
-
-```text
-data/evaluation/retrieval_baseline.csv
-```
-
-The baseline supports inspection of ranked results.
-
-No manually verified relevance score or formal retrieval-quality benchmark is claimed.
-
-V2 deliberately uses lexical retrieval rather than introducing embeddings, vector databases, or language models before they are required.
-
-## 5. End-to-End Document Pipeline
-
-The document workflow is integrated through a dedicated entry point:
-
-```text
-run_filings.py
-```
-
-Example execution:
-
-```bash
-python -m run_filings MSFT
-```
-
-The command performs:
-
-1. SEC 10-K discovery
-2. Filing download
-3. Raw HTML snapshot preservation
-4. Item 1A and Item 7 extraction
-5. Section validation and Parquet storage
-6. Document chunking
-7. Searchable Parquet output
-
-The original structured-data pipeline remains independent:
-
-```bash
-python run_pipeline.py
-```
-
-This separation allows document processing without rerunning CompanyFacts ingestion or dbt analytics.
-
-## Verified V2 Results
-
-Local end-to-end executions were completed on October 17, 2026.
-
-| Company | Item 1A Words | Item 7 Words | Chunks | Runtime |
-|---|---:|---:|---:|---:|
-| Microsoft | 11,759 | 7,695 | 64 | 2.84s |
-| JPMorgan Chase | 15,906 | 59,379 | 253 | 9.10s |
-| Caterpillar | 7,913 | 16,115 | 79 | 2.95s |
-| **Total** | **35,578** | **83,189** | **396** | **14.89s** |
-
-All six target sections were extracted successfully.
-
-Five sections used direct extraction. JPMorgan Chase's Item 7 required referenced-MD&A extraction.
-
-Exact chunk reconstruction was verified for all six sections.
-
-### Automated Tests
-
-The local test suite completed with:
-
-```text
-45 passed, 3 warnings
-```
-
-The three warnings are BeautifulSoup `XMLParsedAsHTMLWarning` messages encountered while parsing SEC filing documents containing inline-XBRL markup.
-
-They did not cause test failures.
-
-V2's local validation is complete. GitHub Actions verification remains a release checkpoint.
-
-The reported runtimes and chunk counts reflect these specific local executions and documents.
-
-## V2 Engineering Findings
-
-### 1. Financial Documents Are Not Structurally Uniform
-
-A parser that assumes identical HTML layouts across companies can fail even when the filings contain the required information.
-
-JPMorgan Chase's referenced MD&A section demonstrated this problem.
-
-**Engineering decision:** Support the observed alternative document layout while keeping the extraction logic explicit and testable.
-
-### 2. Document Processing Must Preserve Traceability
-
-Extracting text is not sufficient if the resulting passages cannot be connected to their source.
-
-**Engineering decision:** Retain filing identifiers, source URLs, section hashes, deterministic chunk IDs, and character offsets throughout processing.
-
-### 3. Chunking Must Preserve Information
-
-Text splitting can accidentally introduce gaps, overlaps, or altered content.
-
-**Engineering decision:** Test exact reconstruction of the normalized source text rather than validating chunk sizes alone.
-
-### 4. Retrieval Does Not Initially Require an LLM
-
-A retrieval system can be built and tested independently of a language model.
-
-**Engineering decision:** Establish lexical retrieval before introducing semantic search or AI-generated answers.
-
-### 5. Reliable Processing Requires Safe Storage
-
-Partial writes can leave processed datasets in an inconsistent state.
-
-**Engineering decision:** Preserve raw filing snapshots and use verified, atomic Parquet writes for processed sections.
-
----
-
-# V1 — Data Foundation
-
-V1 established the structured financial-data pipeline.
-
-It processes SEC CompanyFacts observations through Bronze, Silver, and Gold layers.
-
-## Bronze — SEC CompanyFacts Ingestion
-
-Python retrieves and validates CompanyFacts responses from SEC EDGAR.
-
-The ingestion layer includes:
-
-- Company and CIK validation
-- HTTP retry handling with exponential backoff
-- Timestamped raw JSON snapshots
-- SHA-256 content identifiers
-- Snapshot metadata and observation counts
-
-Raw responses are stored under:
-
-```text
-data/raw/sec/companyfacts/<TICKER>/
-```
-
-Original responses are preserved to support reproducibility and investigation of historical reporting changes.
-
-## Silver — Normalization and Storage
-
-Nested CompanyFacts data is normalized into structured financial observations.
-
-Important fields include:
-
-- Company identifier (CIK)
-- Accounting taxonomy and concept
-- Reported value and unit
-- Reporting period
-- Filing date
-- Accession number
-- Filing form
-- Source snapshot identifier
-
-Processed observations are stored as Parquet and loaded into DuckDB.
-
-```text
-data/processed/companyfacts/
-data/warehouse/financial_intelligence.duckdb
-```
-
-The warehouse tracks loaded snapshots and maintains the active dataset for each company.
-
-Historical filing observations remain available rather than being collapsed into a single latest value.
-
-## Gold — Financial Analytics
-
-dbt builds two analytical models.
-
-### `main_gold.annual_revenue`
-
-Selects annual revenue observations from 10-K filings using company-specific accounting-concept priorities.
-
-The model deduplicates observations by company and fiscal year-end while retaining the selected accounting concept and filing metadata.
-
-### `main_gold.annual_revenue_growth`
-
-Calculates year-over-year revenue growth and includes an `is_comparable` flag.
-
-Growth is excluded when:
-
-- The previous fiscal year is missing
-- Reporting periods are not consecutive
-- An explicitly identified accounting comparability issue applies
-
-Example query:
-
-```sql
-SELECT
-    cik,
-    fiscal_year,
-    revenue_usd,
-    previous_year_revenue_usd,
-    yoy_growth_pct,
-    is_comparable
-FROM main_gold.annual_revenue_growth
-ORDER BY cik, fiscal_year DESC;
-```
-
-## V1 Engineering Findings
-
-### 1. Historical Financial Values Can Change
-
-SEC CompanyFacts may contain multiple reported values for the same accounting concept and reporting period.
-
-During development, Microsoft observations revealed historical changes across subsequent filings.
-
-Simply keeping the latest reported value would remove important reporting history.
-
-**Engineering decision:** Preserve filing-level observations and source metadata in Silver, then apply explicit selection rules in Gold.
-
-### 2. Revenue Is Not One Universal Accounting Concept
-
-Microsoft, JPMorgan Chase, and Caterpillar do not consistently use the same revenue accounting concepts.
-
-The Gold model considers company-specific concepts, including:
-
-- Microsoft: `RevenueFromContractWithCustomerExcludingAssessedTax`, `SalesRevenueNet`, and `Revenues`
-- Caterpillar: `Revenues` and `SalesRevenueNet`
-- JPMorgan Chase: `Revenues` and `RevenuesNetOfInterestExpense`
-
-A generic revenue extraction rule would not reliably represent all three companies.
-
-**Engineering decision:** Use explicit company-specific concept priorities and retain the selected source concept for traceability.
-
-### 3. Valid Arithmetic Does Not Guarantee Valid Comparisons
-
-Microsoft FY2016 exposed an accounting comparability issue.
-
-The selected FY2016 revenue observation reflects a different reporting basis from the selected FY2015 observation.
-
-Calculating percentage growth between the two values would produce a mathematically valid but potentially misleading result.
-
-**Engineering decision:** Mark FY2016 as non-comparable and return NULL for its year-over-year growth.
-
-This is a targeted safeguard, not a comprehensive accounting restatement detection system.
-
-### 4. Analytical Models Must Handle Repeated Filing Periods
-
-Historical SEC observations can contain multiple candidate records for the same fiscal year-end.
-
-Without deduplication, annual revenue models may produce multiple rows for one company and fiscal year.
-
-**Engineering decision:** Rank candidate observations by accounting-concept priority and filing metadata, selecting one annual record per company and fiscal year-end.
-
-Automated dbt tests enforce uniqueness.
-
-## Verified V1 Results
-
-The first verified end-to-end V1 execution was completed on October 17, 2026.
-
-| Metric | Result |
-|---|---:|
-| Companies | 3 |
-| Microsoft observations | 32,671 |
-| JPMorgan Chase observations | 54,089 |
-| Caterpillar observations | 39,403 |
-| Total observations | 126,163 |
-| Gold models | 2 |
-| dbt data tests | 16 |
-| dbt build | 18/18 passed |
-| End-to-end runtime | 9.49 seconds |
-
-These results reflect one verified local execution, not fixed characteristics of future SEC responses.
-
----
-
-## Data Quality and CI
-
-Financial Intelligence uses automated testing across both pipelines.
-
-### Python Tests
-
-Tests cover:
-
-- CompanyFacts normalization
-- Historical observation handling
-- Snapshot lifecycle
-- Filing extraction
-- Section validation and storage
-- Chunking and text reconstruction
-- Lexical retrieval
-
-Run locally:
-
-```bash
-python -m pytest tests -v
-```
-
-### dbt Tests
-
-dbt validates:
-
-- Required analytical fields
-- Unique annual observations
-- Valid revenue records
-- Year-over-year growth calculations
-- Comparability rules
-
-Run:
-
-```bash
-dbt build --project-dir dbt --profiles-dir dbt
-```
-
-### Continuous Integration
-
-GitHub Actions was introduced in V1.
-
-The CI workflow installs dependencies, runs Python tests, creates a synthetic DuckDB dataset, and executes `dbt build`.
-
-The synthetic dataset tests representative financial scenarios without requiring live SEC CompanyFacts requests.
-
-V2 has passed its local test suite. The updated GitHub Actions workflow must be verified before tagging the V2 release.
-
-## Technology Stack
-
-| Technology | Purpose |
+| Technology | Role |
 |---|---|
-| Python | Ingestion and data processing |
-| Requests | SEC API and HTTP communication |
-| BeautifulSoup / lxml | SEC HTML parsing |
-| JSON | Raw SEC data and snapshot metadata |
-| PyArrow / Parquet | Columnar storage |
-| DuckDB | Local warehouse and Parquet-backed retrieval |
-| dbt | Financial analytics and data tests |
-| pytest | Automated testing |
-| GitHub Actions | Continuous integration |
+| Python, Requests | SEC ingestion, validation, and pipeline orchestration |
+| BeautifulSoup, lxml | Filing HTML parsing and section extraction |
+| PyArrow, Parquet | Normalized observations, sections, and chunks |
+| DuckDB, dbt | Persistent financial warehouse, Gold models, and data tests |
+| Streamlit, pandas, Altair | Dashboard, charts, and analyst workspace |
+| OpenAI Responses API | Tool-driven analysis and source-linked risk explanations |
+| pytest, GitHub Actions | Automated checks and fixture-based CI |
 
-## Getting Started
+## Engineering decisions
 
-### Requirements
+- **Immutable raw snapshots; replaceable active data.** Timestamped raw responses and hashes preserve the inputs for investigation. The financial warehouse holds one active snapshot per company while retaining snapshot-load metadata. Newer snapshots replace that company's observations transactionally; older replacements are rejected. Historical filing-level observations within the active payload remain available.
+- **Atomic writes and idempotent reruns.** Processed Parquet is written to temporary files, validated, and atomically replaced. Reloading the same financial snapshot does not duplicate observations; deterministic document processing produces stable chunk identities for unchanged inputs.
+- **Company-specific revenue selection.** Gold models rank accounting concepts separately for Microsoft, JPMorgan Chase, and Caterpillar, then select one observation per company and fiscal year-end. Selected concepts and filing identifiers remain available for traceability.
+- **Explicit comparability safeguards.** Growth requires consecutive fiscal years and a positive prior-year revenue value. Missing prior years and the identified Microsoft FY2016 reporting-basis mismatch suppress growth. This targeted rule is not a general accounting-restatement detector.
+- **Deterministic document provenance.** Chunks retain filing identifiers, source URLs, section hashes, and character offsets. Reconstruction tests check that chunking preserves the normalized section text. Extraction also handles the supported JPMorgan layout where Item 7 references MD&A elsewhere in the filing.
+- **Lexical retrieval before a vector database.** Whole-word matching and transparent scoring keep the small local corpus easy to inspect and test without an embedding pipeline or additional storage service. The tradeoff is limited semantic recall.
+- **Evidence requirements before presentation.** Financial and filing requests track the evidence they require. The response layer reports missing evidence instead of substituting financial context for unsupported risk analysis. Risk-claim validation checks that ticker, chunk ID, and source URL match retrieved evidence; it does not establish that every explanation is semantically correct.
 
-- Python 3.12 or a compatible version supported by the dependencies
-- Git
-- Internet connection for SEC ingestion
-- SEC User-Agent with a real contact email
+## Verified local results
 
-### Clone and Install
+The completed local release smoke tests reported the following results. Dataset sizes describe the stored snapshots; test totals and the individual live check are separate validation outcomes.
 
-```bash
-git clone https://github.com/Samtoussi/financial-intelligence.git
-cd financial-intelligence
+| Category | Verified result |
+|---|---|
+| Dataset scope | Microsoft (`MSFT`), JPMorgan Chase (`JPM`), Caterpillar (`CAT`) |
+| Financial dataset | 126,163 observations |
+| Filing dataset | 396 stored chunks |
+| Python test suite | 226 tests passed |
+| dbt data tests | 16 tests passed |
+| Individual live AI check | Microsoft FY2026 risk analysis returned three cited findings |
 
-python -m venv .venv
-```
+These are results from the verified local environment, not guarantees about future SEC responses or model outputs. The single live AI check is not a passing batch evaluation. A fresh installation and fresh SEC download have not been verified as part of this README update.
 
-Activate the environment.
+## Run locally
 
-Windows PowerShell:
+Use PowerShell from the repository root. Git and Python are required. The verified local release tests used Python 3.12.10, while CI uses Python 3.13. SEC ingestion needs internet access and an identifying User-Agent with your real contact email. AI questions additionally require an OpenAI API key and API access.
+
+### Install
 
 ```powershell
+git clone https://github.com/Samtoussi/financial-intelligence.git
+cd financial-intelligence
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-macOS/Linux:
-
-```bash
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
 python -m pip install -r requirements.txt
 ```
 
-### Configure SEC User-Agent
+### Configure
 
-SEC requests require an identifying application name and a real contact email.
-
-Windows PowerShell:
+Set these values in the PowerShell session that will launch the commands:
 
 ```powershell
 $env:SEC_USER_AGENT = "FinancialIntelligence your-email@example.com"
+$env:OPENAI_API_KEY = "your-openai-api-key"
 ```
 
-macOS/Linux:
+Replace the example email with your real contact address and the key placeholder with your own key. **The ingestion runners require `SEC_USER_AGENT` in the process environment; they do not automatically load `.env`.**
 
-```bash
-export SEC_USER_AGENT="FinancialIntelligence your-email@example.com"
+The AI Analyst loads the repository-root `.env` and also supports `OPENAI_API_KEY` from the process environment; an existing environment value takes precedence. To use a local file instead, copy the supplied template and edit its placeholders:
+
+```powershell
+Copy-Item .env.example .env
 ```
 
-Replace the example address with your own contact email.
+Keep secrets out of version control. Viewing an already populated dashboard does not require an OpenAI key; submitting AI questions does.
 
-### Run the Structured Data Pipeline
+### Populate the local datasets
 
-```bash
+```powershell
+# CompanyFacts for all three companies, Parquet, DuckDB, and dbt Gold build
 python run_pipeline.py
-```
 
-This runs CompanyFacts ingestion, Bronze snapshot storage, Silver normalization and loading, and the dbt Gold build.
-
-### Run the Document Pipeline
-
-```bash
+# Latest available 10-K, extracted sections, and searchable chunks per company
 python -m run_filings MSFT
-```
-
-Other configured companies:
-
-```bash
 python -m run_filings JPM
 python -m run_filings CAT
 ```
 
-The document pipeline downloads the latest available 10-K, extracts Item 1A and Item 7, stores the sections, and builds searchable chunks.
+The filing pipeline runs independently of the financial pipeline. Local data and warehouse files are excluded from version control, so a clone needs population before the dashboard can show financial metrics. These commands match the repository entry points; the completed smoke tests used the existing local setup, rather than a newly installed environment.
 
-### Search SEC Filings
+### Launch and search
 
-```bash
-python -m src.retrieval.search_filings "interest rate risk" --limit 5
+```powershell
+python -m streamlit run app.py
 ```
 
-Filter by company:
+Optional direct excerpt search after building filing chunks:
 
-```bash
-python -m src.retrieval.search_filings "cloud revenue" --ticker MSFT --limit 5
+```powershell
+python -m src.retrieval.search_filings "interest rate risk" --ticker JPM --limit 5
 ```
 
-The document pipeline must be run first to generate the local searchable dataset.
+### Run tests
 
-### Run Tests
-
-Python:
-
-```bash
+```powershell
 python -m pytest tests -v
-```
-
-dbt:
-
-```bash
 dbt build --project-dir dbt --profiles-dir dbt
 ```
 
-## Repository Structure
+The dbt command builds the two Gold models and runs their data tests against the populated financial warehouse.
+
+## Tests, CI, and evaluations
+
+**Python tests** cover normalization, historical observations, snapshot lifecycle, financial queries, filing extraction and storage, exact chunk reconstruction, lexical search, evidence collection, response handling, and dashboard presentation. AI behavior is tested with controlled responses rather than requiring live inference for the standard suite.
+
+**dbt tests** check required fields, annual-record uniqueness, valid revenue records, growth calculations, and comparability rules.
+
+**GitHub Actions** installs dependencies, creates a synthetic financial DuckDB fixture with `scripts/create_ci_db.py`, runs `dbt build`, and executes the Python tests. CI does not perform live SEC ingestion.
+
+**Local integration checks** exercise financial and filing evidence paths, missing-evidence behavior, citations, and application presentation. The release smoke tests also included the individual API-backed Microsoft risk-analysis check reported above.
+
+**Separate API-backed evaluations** use cases in `evals/cases.json` to inspect technical evidence requirements and answer coverage:
+
+```powershell
+python evals/run.py
+```
+
+This command requires local datasets and a configured OpenAI key, makes external API calls, and writes evaluation reports. Historical evaluation output is not presented as a passing current batch. Source-reference and coverage checks do not provide exhaustive semantic fact-checking.
+
+## Scope and limitations
+
+- Three companies are supported: Microsoft, JPMorgan Chase, and Caterpillar. Financial analytics focus on annual revenue and YoY growth.
+- Execution is local and on demand; there is no hosted deployment or scheduled ingestion service.
+- The filing runner discovers the latest available 10-K. Extraction targets Item 1A and Item 7 and supports the observed layouts; it does not guarantee exhaustive filing coverage.
+- Retrieval is lexical and excerpt-based. It has no fiscal-year filter, so selecting a dashboard year does not guarantee that retrieved passages match that fiscal year. Filing metadata helps distinguish reporting periods from filing dates.
+- Citation/source-reference validation establishes provenance, not full semantic verification. Retrieved relevance alone does not prove a claim, and disclosed risks do not establish the cause of a revenue change.
+- AI inference requires the external OpenAI API and sends the question/context and supporting tool evidence to that service.
+- Progressive answer rendering begins after analysis completes; it is a presentation effect rather than live model-token streaming.
+- Displayed chat history is retained in the UI but is not passed back as conversational context. Each question uses its own selected company/year context.
+
+This is an engineering portfolio project, not an investment advisory service.
+
+## Repository structure
 
 ```text
 financial-intelligence/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── dbt/
-│   ├── models/
-│   │   └── gold/
-│   │       ├── annual_revenue.sql
-│   │       ├── annual_revenue_growth.sql
-│   │       └── schema.yml
-│   ├── tests/
-│   ├── dbt_project.yml
-│   └── profiles.yml
-├── scripts/
-│   └── create_ci_db.py
-├── src/
-│   ├── ingestion/
-│   │   ├── companyfacts.py
-│   │   └── filings.py
-│   ├── transformation/
-│   │   ├── load_companyfacts.py
-│   │   ├── parse_filings.py
-│   │   ├── store_filings.py
-│   │   └── chunk_filings.py
-│   └── retrieval/
-│       ├── search_filings.py
-│       └── evaluate.py
-├── tests/
-├── requirements.txt
-├── run_pipeline.py
-├── run_filings.py
-└── README.md
+|-- app.py                       # Streamlit dashboard and contextual analyst
+|-- run_pipeline.py              # CompanyFacts -> Parquet -> DuckDB -> dbt
+|-- run_filings.py               # 10-K ingestion, extraction, and chunking
+|-- src/
+|   |-- ingestion/               # SEC requests and raw snapshots
+|   |-- transformation/          # Normalization, loading, parsing, and chunking
+|   |-- analytics/               # Gold queries and evidence formatting
+|   |-- retrieval/               # Lexical search and filing metadata
+|   |-- ai/                      # Tool orchestration and evidence-aware responses
+|   |-- ui/                      # Analyst answer presentation
+|   `-- evaluation/              # Financial evidence validation
+|-- dbt/                         # Gold SQL models, data tests, and local profile
+|-- tests/                       # Python test suite
+|-- evals/                       # API-backed evaluation cases and runner
+|-- scripts/create_ci_db.py      # Synthetic financial fixture for CI
+|-- .github/workflows/ci.yml      # Automated dbt and Python checks
+|-- assets/                      # Demo, screenshots, and architecture diagram
+|-- data/                        # Local raw/processed data and warehouse (ignored)
+|-- .env.example                 # Configuration template
+`-- requirements.txt            # Pinned Python dependencies
 ```
-
-Local datasets, generated artifacts, databases, and secrets are excluded from version control.
-
-## Limitations
-
-The current platform intentionally has a limited scope.
-
-- Three companies are configured.
-- The demonstrated document workflow processes the latest available 10-K for each company.
-- Document extraction targets Item 1A and Item 7 only.
-- Additional filing layouts may require parser improvements.
-- Retrieval is lexical rather than semantic.
-- No formal, manually labeled retrieval relevance benchmark has been established.
-- Financial analytics focus on annual revenue and year-over-year growth.
-- Accounting comparability handling is partial and explicitly scoped.
-- Pipelines run locally on demand.
-- No hosted application or continuous ingestion service is provided.
-- No LLM-powered financial assistant is implemented yet.
-
-Financial Intelligence is an engineering portfolio project, not an investment advisory service.
-
-## Version History
-
-### V1 — Data Foundation
-
-Established a reproducible SEC financial data pipeline with historical preservation, structured analytics, automated testing, and continuous integration.
-
-**Core question:** Can we build a trustworthy and traceable financial data foundation?
-
-### V2 — Document Intelligence
-
-Added SEC 10-K ingestion, raw document preservation, narrative section extraction, structured Parquet storage, deterministic chunking, and source-traceable lexical retrieval.
-
-Verified end-to-end processing for Microsoft, JPMorgan Chase, and Caterpillar.
-
-**Core question:** Can we retrieve traceable evidence from financial reports?
-
-### V3 — AI Assistant (Planned)
-
-Explore natural-language financial analysis that combines structured financial metrics with retrieved filing evidence.
-
-The objective is to produce answers that can be checked against original financial disclosures.
-
-**Core question:** Can AI answer financial questions with verifiable sources?
-
-### V4 — Product & Operations (Potential)
-
-Explore an interactive interface, deployment, monitoring, and operational improvements where justified by actual requirements.
-
-**Core question:** Can the underlying intelligence become a useful and reliable product?
-
-## Project Philosophy
-
-Financial Intelligence follows a simple engineering principle:
-
-**Build the smallest system that solves the current problem, then evolve it when new requirements justify additional complexity.**
-
-V1 establishes structured financial data.
-
-V2 introduces searchable narrative evidence.
-
-V3 can build on both foundations without introducing AI prematurely.
-
-> **The goal is not to attach AI to a dashboard. It is to build a financial intelligence system whose answers can be traced back to evidence.**
