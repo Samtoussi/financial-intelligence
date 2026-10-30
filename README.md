@@ -163,6 +163,40 @@ This command requires local datasets and a configured OpenAI key, makes external
 
 ## Scope and limitations
 
+### V4 M002: quarterly report baseline
+
+M002 adds a bounded Microsoft FY2027 Q1 10-Q report experiment to the existing
+filing pipeline. It extracts Part I Items 1 and 2, generates six metric pairs,
+six YoY changes, and three cited interpretation notes, then evaluates the saved
+output against the reviewed M001 fixture. The annual dashboard, analyst, and dbt
+Gold models retain their existing contracts.
+
+```powershell
+# Reads SEC_USER_AGENT and OPENAI_API_KEY from the root .env (environment wins).
+# Downloads only accession 0001193125-26-436133; makes one model call.
+python evals/run.py --report-baseline --download
+
+# Re-evaluate a saved run without SEC or OpenAI calls.
+python evals/run.py --report-baseline --evaluate-run evals/reports/m002/<run_id>
+```
+
+Artifacts are saved under `evals/reports/m002/<run_id>/` and ignored by Git.
+Ground truth is never supplied to the generator. Exact Decimal comparisons,
+table-row support, citation integrity, and manual semantic review are separate
+checks. Exit code **2** means automatic checks passed but human review remains;
+pending reviews never count as an overall pass.
+
+The single live baseline produced **12/12 values, 6/6 YoY changes, and 6/6
+table-supported pairs** after correcting evaluation parsing of thousands
+separators and outer table delimiters. Raw model output and the initial evaluation
+are retained. All three qualitative reviews passed human review assisted by
+ChatGPT; the saved run has `overall_pass: true` and evaluation exit code **0**.
+This is one feasibility run, not a reliability estimate.
+
+See [M002 workflow, artifacts, review rubric, and limitations](evals/M002.md).
+
+### Existing platform limitations
+
 - Three companies are supported: Microsoft, JPMorgan Chase, and Caterpillar. Financial analytics focus on annual revenue and YoY growth.
 - Execution is local and on demand; there is no hosted deployment or scheduled ingestion service.
 - The filing runner discovers the latest available 10-K. Extraction targets Item 1A and Item 7 and supports the observed layouts; it does not guarantee exhaustive filing coverage.

@@ -176,6 +176,11 @@ def run_case(case: dict) -> dict:
 
 
 def main():
+    if "--report-baseline" in sys.argv[1:]:
+        from evals.run_report import main as report_main
+        args = sys.argv[1:]
+        args.remove("--report-baseline")
+        sys.exit(report_main(args))
     cases = json.loads(
         CASES_PATH.read_text(encoding="utf-8")
     )["cases"]

@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,12 +46,25 @@ def fetch(url: str, user_agent: str) -> bytes:
 
 
 def discover_latest_10k(cik: int, user_agent: str) -> dict:
+    return discover_filing(cik, user_agent)
+
+
+def discover_filing(
+    cik: int, user_agent: str, form: str = "10-K", accession: str | None = None,
+) -> dict:
+    """Select an exact filing when pinned; never fall back to another accession."""
+    if form not in {"10-K", "10-Q"}:
+        raise ValueError("Supported forms: 10-K, 10-Q")
+    if accession is not None and not re.fullmatch(r"\d{10}-\d{2}-\d{6}", accession):
+        raise ValueError("Invalid accession")
     url = f"{SUBMISSIONS_URL}/CIK{cik:010d}.json"
     data = json.loads(fetch(url, user_agent))
     recent = data["filings"]["recent"]
 
-    for index, form in enumerate(recent["form"]):
-        if form != "10-K":
+    for index, candidate_form in enumerate(recent["form"]):
+        if candidate_form != form:
+            continue
+        if accession is not None and recent["accessionNumber"][index] != accession:
             continue
 
         accession = recent["accessionNumber"][index]
@@ -69,7 +83,7 @@ def discover_latest_10k(cik: int, user_agent: str) -> dict:
             ),
         }
 
-    raise ValueError(f"No recent 10-K found for CIK {cik}")
+    raise ValueError(f"No recent {form} found for CIK {cik}, accession={accession}")
 
 
 def save_snapshot(ticker: str, payload: bytes, filing: dict) -> Path:
@@ -119,6 +133,8 @@ def main():
         description="Download latest SEC 10-K filing"
     )
     parser.add_argument("ticker", choices=sorted(COMPANIES))
+    parser.add_argument("--form", choices=("10-K", "10-Q"), default="10-K")
+    parser.add_argument("--accession")
     args = parser.parse_args()
 
     user_agent = os.environ.get("SEC_USER_AGENT", "").strip()
@@ -129,9 +145,9 @@ def main():
     ticker = args.ticker
     cik = COMPANIES[ticker]
 
-    print(f"Discovering latest 10-K for {ticker}...")
+    print(f"Discovering {args.form} for {ticker}...")
 
-    filing = discover_latest_10k(cik, user_agent)
+    filing = discover_filing(cik, user_agent, args.form, args.accession)
     payload = fetch(filing["source_url"], user_agent)
     path = save_snapshot(ticker, payload, filing)
 

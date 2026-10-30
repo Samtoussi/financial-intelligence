@@ -68,6 +68,7 @@ def search_filings(
     query: str,
     ticker: str | None = None,
     limit: int = 5,
+    *, accession: str | None = None,
 ) -> list[dict]:
     query_terms = tokenize(query)
 
@@ -102,9 +103,18 @@ def search_filings(
 
         params = []
 
+        filters = []
         if ticker:
-            sql += " WHERE ticker = ?"
+            filters.append("ticker = ?")
             params.append(ticker.upper())
+        if accession:
+            filters.append("accession = ?")
+            params.append(accession)
+        else:
+            # Keep the annual analyst's existing corpus when quarters are indexed.
+            filters.append("form = '10-K'")
+        if filters:
+            sql += " WHERE " + " AND ".join(filters)
 
         rows = con.execute(sql, params).fetchall()
 
@@ -147,6 +157,7 @@ def main():
     parser.add_argument("query")
     parser.add_argument("--ticker")
     parser.add_argument("--limit", type=int, default=5)
+    parser.add_argument("--accession")
 
     args = parser.parse_args()
 
@@ -154,6 +165,7 @@ def main():
         args.query,
         ticker=args.ticker,
         limit=args.limit,
+        accession=args.accession,
     )
 
     print(f"\nQUERY: {args.query}")

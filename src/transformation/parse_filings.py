@@ -28,11 +28,17 @@ def normalized_heading(text: str) -> str:
     return text.rstrip(".: ")
 
 
-def load_latest_snapshot(ticker: str) -> tuple[bytes, dict]:
+def load_latest_snapshot(
+    ticker: str, *, accession: str | None = None, form: str = "10-K",
+    snapshot_path: Path | None = None,
+) -> tuple[bytes, dict]:
     root = RAW_DIR / ticker
 
+    if accession is not None and not re.fullmatch(r"\d{10}-\d{2}-\d{6}", accession):
+        raise ValueError("Invalid accession")
     snapshots = sorted(
-        root.glob("*/*.html"),
+        ([Path(snapshot_path)] if snapshot_path is not None else
+         root.glob(f"{accession or '*'}/*.html")),
         key=lambda path: path.stat().st_mtime_ns,
         reverse=True,
     )
@@ -40,13 +46,17 @@ def load_latest_snapshot(ticker: str) -> tuple[bytes, dict]:
     if not snapshots:
         raise FileNotFoundError(f"No filing snapshot for {ticker}")
 
-    path = snapshots[0]
-    metadata_path = path.with_name(
-        path.name.removesuffix(".html") + ".metadata.json"
-    )
+    for path in snapshots:
+        metadata_path = path.with_name(path.stem + ".metadata.json")
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if metadata.get("form") == form and (
+            accession is None or metadata.get("accession") == accession
+        ):
+            break
+    else:
+        raise ValueError(f"No matching {form} snapshot for {ticker}, accession={accession}")
 
     payload = path.read_bytes()
-    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
 
     actual_hash = hashlib.sha256(payload).hexdigest()
 
@@ -57,6 +67,56 @@ def load_latest_snapshot(ticker: str) -> tuple[bytes, dict]:
         raise ValueError("Snapshot ticker mismatch")
 
     return payload, metadata
+
+
+def quarterly_boundaries(soup: BeautifulSoup) -> list[Tag]:
+    """Bounded Microsoft layout: resolve the three Part I TOC destinations.
+
+    Following TOC links avoids repeated page headers and Part II item numbers.
+    Ambiguous or changed layouts fail closed.
+    """
+    titles = (
+        "financial statements",
+        "management’s discussion and analysis of financial condition and results of operations",
+        "quantitative and qualitative disclosures about market risk",
+    )
+    result = []
+    for title in titles:
+        links = [a for a in soup.find_all("a", href=True)
+                 if normalized_heading(a.get_text(" ", strip=True)).replace("'", "’") == title]
+        destinations = {a["href"][1:] for a in links if a["href"].startswith("#")}
+        if len(destinations) != 1:
+            raise ValueError(f"Ambiguous 10-Q boundary: {title}")
+        target = destinations.pop()
+        nodes = soup.find_all(id=target) or soup.find_all("a", attrs={"name": target})
+        if len(nodes) != 1:
+            raise ValueError(f"Missing or ambiguous 10-Q destination: {title}")
+        result.append(nodes[0])
+    return result
+
+
+def quarterly_text(soup: BeautifulSoup, start: Tag, end: Tag) -> str:
+    """Preserve table rows/cells alongside the surrounding labels and units."""
+    nodes = list(soup.descendants)
+    positions = {id(node): i for i, node in enumerate(nodes)}
+    lo, hi = positions[id(start)], positions[id(end)]
+    if lo >= hi:
+        raise ValueError("Invalid 10-Q section boundaries")
+    parts = []
+    for node in nodes[lo:hi]:
+        if isinstance(node, Tag):
+            if node.name == "tr":
+                parts.append("\n")
+            elif node.name in {"td", "th"}:
+                parts.append(" | ")
+            elif node.name in {"p", "div", "br"} and node.find_parent("table") is None:
+                parts.append("\n")
+        elif isinstance(node, NavigableString) and str(node).strip():
+            parts.append(normalize(str(node)) + " ")
+    text = "\n".join(normalize(line) for line in "".join(parts).splitlines() if line.strip())
+    if len(text) < 500:
+        raise ValueError("10-Q section is unexpectedly short")
+    return text
 
 
 def parse_html(payload: bytes) -> BeautifulSoup:
@@ -281,9 +341,32 @@ def find_referenced_mda(soup: BeautifulSoup, item7: Tag) -> tuple[Tag, Tag]:
     return start, end
 
 
-def parse_filing(ticker: str) -> list[dict]:
-    payload, metadata = load_latest_snapshot(ticker)
+def parse_filing(
+    ticker: str, *, accession: str | None = None, form: str = "10-K",
+    snapshot_path: Path | None = None,
+) -> list[dict]:
+    payload, metadata = load_latest_snapshot(
+        ticker, accession=accession, form=form, snapshot_path=snapshot_path,
+    )
     soup = parse_html(payload)
+
+    if form == "10-Q":
+        if ticker != "MSFT":
+            raise ValueError("10-Q extraction currently supports MSFT only")
+        starts = quarterly_boundaries(soup)
+        records = []
+        for i, item in enumerate(("I.1", "I.2")):
+            text = quarterly_text(soup, starts[i], starts[i + 1])
+            records.append({
+                **{key: metadata[key] for key in (
+                    "ticker", "cik", "accession", "filing_date", "report_date", "form", "source_url",
+                )},
+                "item": item, "extraction_method": "part_i_toc",
+                "text": text, "characters": len(text), "words": len(text.split()),
+            })
+        return records
+    if form != "10-K":
+        raise ValueError("Unsupported filing form")
 
     boundaries = {
         "1A": "1B",

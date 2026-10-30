@@ -34,15 +34,16 @@ SCHEMA = pa.schema(
 )
 
 
-def prepare_sections(ticker: str) -> list[dict]:
-    sections = parse_filing(ticker)
+def prepare_sections(ticker: str, **selection) -> list[dict]:
+    sections = parse_filing(ticker, **selection)
 
     if len(sections) != 2:
         raise ValueError(
             f"Expected 2 sections for {ticker}, got {len(sections)}"
         )
 
-    if {section["item"] for section in sections} != {"1A", "7"}:
+    expected = {"I.1", "I.2"} if selection.get("form") == "10-Q" else {"1A", "7"}
+    if {section["item"] for section in sections} != expected:
         raise ValueError("Unexpected or duplicate filing sections")
 
     records = []

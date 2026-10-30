@@ -1,0 +1,257 @@
+{
+  "schema_version": 1,
+  "milestone": "M001",
+  "report": {
+    "company": "Microsoft Corporation",
+    "cik": "0000789019",
+    "form": "10-Q",
+    "fiscal_period": "FY2027 Q1",
+    "period_end": "2026-09-30",
+    "filing_date": "2026-10-28",
+    "accession": "0001193125-26-436133",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+    "filing_date_source": {
+      "url": "https://microsoft.gcs-web.com/financial-information/sec-filings",
+      "section": "SEC Filings",
+      "location": "Oct 28, 2026 / 10-Q / accession 0001193125-26-436133"
+    }
+  },
+  "periods": {
+    "current": {
+      "fiscal_period": "FY2027 Q1",
+      "start": "2026-07-01",
+      "end": "2026-09-30"
+    },
+    "prior": {
+      "fiscal_period": "FY2026 Q1",
+      "start": "2025-07-01",
+      "end": "2025-09-30"
+    }
+  },
+  "metrics": [
+    {
+      "id": "revenue",
+      "unit": "USD millions",
+      "gaap_status": "GAAP",
+      "current": {
+        "value": "92279",
+        "period": {
+          "fiscal_period": "FY2027 Q1",
+          "start": "2026-07-01",
+          "end": "2026-09-30"
+        }
+      },
+      "prior": {
+        "value": "77673",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2025-07-01",
+          "end": "2025-09-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+        "section": "Part I, Item 1 / Income Statements",
+        "page": 3,
+        "table": "Income Statements",
+        "row": "Total revenue",
+        "columns": "Three Months Ended September 30: 2026 / 2025"
+      }
+    },
+    {
+      "id": "operating_income",
+      "unit": "USD millions",
+      "gaap_status": "GAAP",
+      "current": {
+        "value": "45915",
+        "period": {
+          "fiscal_period": "FY2027 Q1",
+          "start": "2026-07-01",
+          "end": "2026-09-30"
+        }
+      },
+      "prior": {
+        "value": "37961",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2025-07-01",
+          "end": "2025-09-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+        "section": "Part I, Item 1 / Income Statements",
+        "page": 3,
+        "table": "Income Statements",
+        "row": "Operating income",
+        "columns": "Three Months Ended September 30: 2026 / 2025"
+      }
+    },
+    {
+      "id": "net_income",
+      "unit": "USD millions",
+      "gaap_status": "GAAP",
+      "current": {
+        "value": "36629",
+        "period": {
+          "fiscal_period": "FY2027 Q1",
+          "start": "2026-07-01",
+          "end": "2026-09-30"
+        }
+      },
+      "prior": {
+        "value": "27747",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2025-07-01",
+          "end": "2025-09-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+        "section": "Part I, Item 1 / Income Statements",
+        "page": 3,
+        "table": "Income Statements",
+        "row": "Net income",
+        "columns": "Three Months Ended September 30: 2026 / 2025"
+      }
+    },
+    {
+      "id": "diluted_eps",
+      "unit": "USD per share",
+      "gaap_status": "GAAP",
+      "current": {
+        "value": "4.92",
+        "period": {
+          "fiscal_period": "FY2027 Q1",
+          "start": "2026-07-01",
+          "end": "2026-09-30"
+        }
+      },
+      "prior": {
+        "value": "3.72",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2025-07-01",
+          "end": "2025-09-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+        "section": "Part I, Item 1 / Income Statements",
+        "page": 3,
+        "table": "Income Statements",
+        "row": "Earnings per share / Diluted",
+        "columns": "Three Months Ended September 30: 2026 / 2025"
+      }
+    },
+    {
+      "id": "agents_and_infra_revenue",
+      "unit": "USD millions",
+      "gaap_status": "GAAP segment disclosure",
+      "current": {
+        "value": "76795",
+        "period": {
+          "fiscal_period": "FY2027 Q1",
+          "start": "2026-07-01",
+          "end": "2026-09-30"
+        }
+      },
+      "prior": {
+        "value": "61672",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2025-07-01",
+          "end": "2025-09-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+        "section": "Part I, Item 1 / Note 16 - Segment Information and Geographic Data",
+        "page": 26,
+        "table": "Segment revenue, cost of revenue, operating expenses, and operating income",
+        "row": "Agents and Infra / Revenue",
+        "columns": "Three Months Ended September 30: 2026 / 2025"
+      }
+    },
+    {
+      "id": "devices_and_consumer_revenue",
+      "unit": "USD millions",
+      "gaap_status": "GAAP segment disclosure",
+      "current": {
+        "value": "15484",
+        "period": {
+          "fiscal_period": "FY2027 Q1",
+          "start": "2026-07-01",
+          "end": "2026-09-30"
+        }
+      },
+      "prior": {
+        "value": "16001",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2025-07-01",
+          "end": "2025-09-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+        "section": "Part I, Item 1 / Note 16 - Segment Information and Geographic Data",
+        "page": 26,
+        "table": "Segment revenue, cost of revenue, operating expenses, and operating income",
+        "row": "Devices and Consumer / Revenue",
+        "columns": "Three Months Ended September 30: 2026 / 2025"
+      }
+    }
+  ],
+  "qualitative_review_cases": [
+    {
+      "id": "gaap_vs_non_gaap",
+      "question": "Distinguish reported net income and diluted EPS from adjusted measures.",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+          "section": "Part I, Item 2 / Financial Summary",
+          "page": 32,
+          "location": "Reported and adjusted net income and diluted earnings per share rows; paragraph immediately below table"
+        }
+      ]
+    },
+    {
+      "id": "recast_segment_comparability",
+      "question": "Check whether prior segment amounts use the current segment structure.",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+          "section": "Part I, Item 1 / Note 1 / Recast of Certain Prior Period Information",
+          "page": 8,
+          "location": "First two paragraphs"
+        }
+      ]
+    },
+    {
+      "id": "azure_growth_vs_cloud_margin",
+      "question": "Distinguish Azure revenue growth from Microsoft Cloud gross margin percentage.",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+          "section": "Part I, Item 2 / Financial Summary",
+          "page": 32,
+          "location": "Gross margin discussion, Microsoft Cloud bullet"
+        },
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526436133/msft-20260930.htm",
+          "section": "Part I, Item 2 / Segment Results of Operations / Agents and Infra",
+          "page": 33,
+          "location": "Azure revenue growth bullet"
+        }
+      ]
+    }
+  ]
+}

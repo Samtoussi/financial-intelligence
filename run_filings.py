@@ -8,6 +8,7 @@ from pathlib import Path
 from src.ingestion.companyfacts import COMPANIES
 from src.ingestion.filings import (
     discover_latest_10k,
+    discover_filing,
     fetch,
     save_snapshot,
 )
@@ -21,7 +22,7 @@ from src.transformation.chunk_filings import process_ticker
 ROOT = Path(__file__).resolve().parent
 
 
-def run_filings(ticker: str) -> None:
+def run_filings(ticker: str, *, form: str = "10-K", accession: str | None = None) -> None:
     start = time.perf_counter()
     os.chdir(ROOT)
 
@@ -51,12 +52,10 @@ def run_filings(ticker: str) -> None:
     print("=" * 60)
 
     # Bronze: Discover and download the latest SEC 10-K.
-    print("\n[BRONZE] Discovering latest 10-K...")
+    print(f"\n[BRONZE] Discovering {form}" + (f" {accession}..." if accession else " (latest)..."))
 
-    filing = discover_latest_10k(
-        cik,
-        user_agent,
-    )
+    filing = (discover_latest_10k(cik, user_agent) if form == "10-K" and accession is None
+              else discover_filing(cik, user_agent, form, accession))
 
     print(f"Accession: {filing['accession']}")
     print(f"Filing date: {filing['filing_date']}")
@@ -76,9 +75,9 @@ def run_filings(ticker: str) -> None:
     print(f"Snapshot: {snapshot_path}")
 
     # Silver: Parse and validate Item 1A and Item 7.
-    print("\n[SILVER] Extracting filing sections...")
+    print(f"\n[SILVER] Extracting {form} sections...")
 
-    records = prepare_sections(ticker)
+    records = prepare_sections(ticker, form=form, accession=filing["accession"], snapshot_path=snapshot_path)
 
     for record in records:
         print(
@@ -118,7 +117,7 @@ def run_filings(ticker: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="SEC 10-K document pipeline"
+        description="SEC document pipeline (default: latest 10-K)"
     )
 
     parser.add_argument(
@@ -126,10 +125,13 @@ def main():
         help="Company ticker, e.g. MSFT",
     )
 
+    parser.add_argument("--form", choices=("10-K", "10-Q"), default="10-K")
+    parser.add_argument("--accession")
+
     args = parser.parse_args()
 
     try:
-        run_filings(args.ticker)
+        run_filings(args.ticker, form=args.form, accession=args.accession)
     except Exception as exc:
         print(
             f"\nDOCUMENT PIPELINE FAILED: {exc}",
