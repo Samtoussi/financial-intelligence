@@ -214,6 +214,21 @@ interpretation notes with span IDs. The default M002 path remains unchanged.
 This uses the cached pinned source and makes one model call. See
 [M003 profiles, verified source values, commands, and limitations](evals/M003.md).
 
+### M004-A: offline investor report presentation
+
+A separate deterministic renderer creates investor-facing Markdown from a saved,
+fully reviewed quarterly run. It retains the M003 read-only evaluation gate,
+formats headline values in billions, preserves exact values and quotations in
+supporting detail, and keeps M004 human review pending.
+
+```powershell
+python evals/render_investor_report.py --run evals/reports/m003/20261030T211637Z_de30375b
+```
+
+No SEC or model calls are made. New artifacts are saved under `evals/reports/m004/`.
+Exit code 2 indicates automatic checks passed with presentation review pending.
+See [M004-A workflow, artifacts, tests, and limitations](evals/M004.md).
+
 ### Existing platform limitations
 
 - Three companies are supported: Microsoft, JPMorgan Chase, and Caterpillar. Financial analytics focus on annual revenue and YoY growth.
