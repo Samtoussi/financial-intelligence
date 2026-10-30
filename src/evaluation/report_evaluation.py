@@ -1,4 +1,4 @@
-"""M002 numeric checks, citation integrity, bounded table support and manual review.
+"""Quarterly report numeric checks, citation integrity, bounded table support and manual review.
 
 Quoted text membership is not semantic entailment. Numerical support is checked
 against the labeled source table rows; interpretation remains explicitly manual.
@@ -7,8 +7,9 @@ import hashlib
 import re
 from decimal import Decimal, InvalidOperation
 
-from src.analytics.report_evidence import REPORT, METRICS, NOTE_IDS
-from src.evaluation.ground_truth import validate, yoy
+from src.analytics.report_profiles import DEFAULT_PROFILE, get_profile, table_context
+from src.evaluation.ground_truth import yoy
+from src.evaluation.report_ground_truth import validate_report_dataset
 from src.transformation.parse_filings import normalize
 
 RUBRIC = {
@@ -32,9 +33,20 @@ def decimal_value(value):
         return None
 
 
-def _source_row(evidence, mid):
+def valid_table_context(text, config):
+    """Require the declared pair in table-header order, not merely elsewhere in a packet."""
+    terms = table_context(config)
+    if not all(term in text for term in terms):
+        return False
+    header = text.split("Revenue")[0].split("Total revenue")[0]
+    years = re.findall(r"(?<!\d)(?:19|20)\d{2}(?!\d)", header)
+    return years == list(terms[1:3])
+
+
+def _source_row(evidence, mid, *, profile=DEFAULT_PROFILE):
+    metrics = get_profile(profile)["metrics"]
     text = evidence["text"]
-    label = METRICS[mid][0]
+    label = metrics[mid][0]
     if mid.endswith("_revenue"):
         if evidence.get("label") != "segment_table":
             return None
@@ -56,9 +68,12 @@ def _source_row(evidence, mid):
     return row, [Decimal(n.replace(",", "")) for n in amounts]
 
 
-def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=None):
+def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=None, profile=DEFAULT_PROFILE):
     """Evaluate untrusted model output; pending manual review never passes."""
-    validate(ground_truth)
+    config = get_profile(profile)
+    report_identity, metrics = config["report"], config["metrics"]
+    note_ids = tuple(config["topics"])
+    validate_report_dataset(ground_truth, profile)
     failures = []
     integrity_errors = []
     quote_errors = []
@@ -77,7 +92,7 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
         if not isinstance(eid, str) or eid in index:
             integrity_errors.append("Missing or duplicate evidence ID")
             continue
-        if (e.get("accession") != REPORT["accession"] or e.get("source_url") != REPORT["source_url"]
+        if (e.get("accession") != report_identity["accession"] or e.get("source_url") != report_identity["source_url"]
                 or e.get("ticker") != "MSFT" or e.get("form") != "10-Q"
                 or not re.fullmatch(r"[0-9a-f]{64}", source_sha256 or "")
                 or e.get("source_sha256") != source_sha256
@@ -108,13 +123,13 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
     meta = report.get("report")
     meta = meta if isinstance(meta, dict) else {}
     for key in ("ticker", "form", "accession", "fiscal_period", "period_start", "period_end", "prior_start", "prior_end"):
-        if meta.get(key) != REPORT[key]:
+        if meta.get(key) != report_identity[key]:
             metadata_errors.append(f"Report mismatch: {key}")
     actual_metrics = report.get("metrics", [])
     actual_metrics = actual_metrics if isinstance(actual_metrics, list) else []
     by_id = {}
     for m in actual_metrics:
-        if not isinstance(m, dict) or m.get("id") not in METRICS or m.get("id") in by_id:
+        if not isinstance(m, dict) or m.get("id") not in metrics or m.get("id") in by_id:
             failures.append("Unexpected, malformed or duplicate metric")
         else:
             by_id[m["id"]] = m
@@ -140,15 +155,15 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
                 metadata_errors.append(f"Metric mismatch: {mid}.{field}")
         supported = False
         for e, quote in citations(m, mid):
-            source_row = _source_row(e, mid)
+            source_row = _source_row(e, mid, profile=profile)
             if source_row is None:
                 continue
             row, amounts = source_row
-            context = all(term in e["text"] for term in ("2026", "2025", "September 30", "millions"))
+            context = valid_table_context(e["text"], config)
             if mid == "diluted_eps":
                 context = context and "per share" in e["text"]
             if (context and normalize(row).strip("| ") in normalize(quote)
-                    and (not mid.endswith("_revenue") or METRICS[mid][0] in quote)
+                    and (not mid.endswith("_revenue") or metrics[mid][0] in quote)
                     and amounts == [decimal_value(m.get("current")), decimal_value(m.get("prior"))]):
                 supported = True
         support_passed += int(supported)
@@ -160,13 +175,13 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
     notes = notes if isinstance(notes, list) else []
     notes_by_id = {}
     for note in notes:
-        if not isinstance(note, dict) or note.get("id") not in NOTE_IDS or note.get("id") in notes_by_id:
+        if not isinstance(note, dict) or note.get("id") not in note_ids or note.get("id") in notes_by_id:
             failures.append("Unexpected, malformed or duplicate interpretation note")
         else:
             notes_by_id[note["id"]] = note
     manual = []
     reviews = reviews or {}
-    for nid in NOTE_IDS:
+    for nid in note_ids:
         note = notes_by_id.get(nid, {})
         cited = citations(note, nid)
         if not isinstance(note.get("text"), str) or not note["text"].strip():
@@ -178,20 +193,22 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
         if status in {"pass", "fail"} and not (
             isinstance(review.get("reviewer"), str) and review["reviewer"].strip()
             and isinstance(review.get("rationale"), str) and review["rationale"].strip()
-            and review.get("evidence_ids") and set(review["evidence_ids"]).issubset({e["evidence_id"] for e, _ in cited})
+            and isinstance(review.get("evidence_ids"), list) and review["evidence_ids"]
+            and all(isinstance(eid, str) for eid in review["evidence_ids"])
+            and set(review["evidence_ids"]).issubset({e["evidence_id"] for e, _ in cited})
         ):
             status = "pending_manual_review"
-        manual.append({"id": nid, "status": status, "rubric": RUBRIC[nid],
+        manual.append({"id": nid, "status": status, "rubric": RUBRIC.get(nid, config["topics"][nid]),
                        "reviewer": review.get("reviewer"), "rationale": review.get("rationale"),
                        "evidence_ids": [e["evidence_id"] for e, _ in cited],
                        "instruction": "Compare every assertion with the quoted disclosure; a matching quote alone is insufficient."})
     automatic_ok = not (failures or integrity_errors or quote_errors or metadata_errors or support_errors)
     return {
-        "evaluation_version": "m002-eval-v2",
+        "evaluation_version": "m003-eval-v1",
         "number_normalization": "Correctly grouped thousands separators are removed before exact Decimal comparison; no numeric tolerance is used.",
-        "financial_values": {"passed": value_passed, "total": 12},
-        "yoy_changes": {"passed": yoy_passed, "total": 6},
-        "table_evidence_support": {"passed": support_passed, "total": 6},
+        "financial_values": {"passed": value_passed, "total": 2 * len(metrics)},
+        "yoy_changes": {"passed": yoy_passed, "total": len(metrics)},
+        "table_evidence_support": {"passed": support_passed, "total": len(metrics)},
         "metric_details": details, "metadata_pass": not metadata_errors,
         "citation_integrity_pass": not integrity_errors,
         "quote_membership_pass": not quote_errors,

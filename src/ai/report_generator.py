@@ -1,9 +1,10 @@
-"""One evidence-grounded M002 report call; no evaluation data enters this module."""
+"""One evidence-grounded quarterly report call; no evaluation data enters this module."""
+import copy
 import json
 import time
 from openai import OpenAI
 
-from src.analytics.report_evidence import REPORT, METRICS, NOTE_IDS
+from src.analytics.report_profiles import DEFAULT_PROFILE, REPORT, METRICS, NOTE_IDS, get_profile
 
 MODEL = "gpt-5-mini"
 PROMPT_VERSION = "m002-v1"
@@ -50,26 +51,44 @@ SCHEMA = {"type": "json_schema", "name": "quarterly_report", "strict": True,
           })}
 
 
-def generate_report(evidence: list[dict], client=None, *, model=MODEL) -> tuple[dict, dict]:
-    if not evidence or any(e.get("accession") != REPORT["accession"] for e in evidence):
+def output_schema(profile=DEFAULT_PROFILE):
+    config = get_profile(profile)
+    schema = copy.deepcopy(SCHEMA)
+    fields = schema["schema"]["properties"]
+    for field, ids in (("metrics", config["metrics"]), ("notes", config["topics"])):
+        fields[field].update(minItems=len(ids), maxItems=len(ids))
+        fields[field]["items"]["properties"]["id"]["enum"] = list(ids)
+    return schema
+
+
+def instructions_for(profile=DEFAULT_PROFILE):
+    return INSTRUCTIONS if profile == DEFAULT_PROFILE else INSTRUCTIONS.replace("all six requested", "all declared requested")
+
+
+def prompt_version(profile=DEFAULT_PROFILE):
+    return PROMPT_VERSION if profile == DEFAULT_PROFILE else "m003-v1"
+
+
+def generate_report(evidence: list[dict], client=None, *, model=MODEL, profile=DEFAULT_PROFILE) -> tuple[dict, dict]:
+    config = get_profile(profile)
+    report, metrics = config["report"], config["metrics"]
+    schema = output_schema(profile)
+    if not evidence or any(any(e.get(k) != report[k] for k in ("accession", "source_url", "ticker", "form")) for e in evidence):
         raise ValueError("Missing or wrong-filing report evidence")
     if client is None:
         client = OpenAI(timeout=180.0, max_retries=0)
     started = time.perf_counter()
     response = client.responses.create(
-        model=model, instructions=INSTRUCTIONS,
+        model=model, instructions=instructions_for(profile),
         input=json.dumps({
-            "report": {k: REPORT[k] for k in SCHEMA["schema"]["properties"]["report"]["properties"]},
+            "report": {k: report[k] for k in schema["schema"]["properties"]["report"]["properties"]},
             "requested_metrics": [{"id": mid, "label": v[0], "unit": v[1], "gaap_status": v[2]}
-                                  for mid, v in METRICS.items()],
-            "interpretation_topics": [
-                {"id": NOTE_IDS[0], "question": "Distinguish reported earnings from adjusted measures."},
-                {"id": NOTE_IDS[1], "question": "Assess the basis for prior segment comparisons."},
-                {"id": NOTE_IDS[2], "question": "Distinguish Azure revenue growth from Cloud gross margin percentage."},
-            ],
+                                  for mid, v in metrics.items()],
+            "interpretation_topics": [{"id": nid, "question": question}
+                                      for nid, question in config["topics"].items()],
             "evidence": evidence,
         }, ensure_ascii=False),
-        text={"format": SCHEMA}, max_output_tokens=12000,
+        text={"format": schema}, max_output_tokens=12000,
     )
     latency = round(time.perf_counter() - started, 3)
     if response.status != "completed" or not response.output_text:
@@ -79,7 +98,7 @@ def generate_report(evidence: list[dict], client=None, *, model=MODEL) -> tuple[
         raise ValueError("Report output must be an object")
     usage = getattr(response, "usage", None)
     return report, {
-        "model": model, "prompt_version": PROMPT_VERSION, "latency_seconds": latency,
+        "model": model, "prompt_version": prompt_version(profile), "latency_seconds": latency,
         "response_id": getattr(response, "id", None),
         "token_usage": usage.model_dump() if hasattr(usage, "model_dump") else None,
     }

@@ -195,6 +195,25 @@ This is one feasibility run, not a reliability estimate.
 
 See [M002 workflow, artifacts, review rubric, and limitations](evals/M002.md).
 
+### V4 M003: two-filing generalization
+
+The quarterly experiment now supports explicit profiles for Microsoft FY2027 Q1
+(the unchanged M002 default) and FY2026 Q1 (`0001193125-25-256321`). The second
+profile declares three segment revenues, producing seven metric pairs. Evidence,
+structured output, and evaluation use the selected profile; oracle values stay
+separate from model inputs. Human review remains mandatory.
+
+```powershell
+python evals/run_report.py --profile msft_fy2026_q1
+```
+
+An opt-in deterministic assembly mode is available with `--generation-mode m003-v2`.
+Python calculates financial values and resolves exact source spans; the model returns
+interpretation notes with span IDs. The default M002 path remains unchanged.
+
+This uses the cached pinned source and makes one model call. See
+[M003 profiles, verified source values, commands, and limitations](evals/M003.md).
+
 ### Existing platform limitations
 
 - Three companies are supported: Microsoft, JPMorgan Chase, and Caterpillar. Financial analytics focus on annual revenue and YoY growth.
