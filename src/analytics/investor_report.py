@@ -12,7 +12,7 @@ from uuid import uuid4
 from src.ai.report_assembly import MODE, assemble, prepare
 from src.ai.report_generator import render_report
 from src.analytics.report_evidence import build_report_evidence
-from src.analytics.report_profiles import DEFAULT_PROFILE, get_profile, profile_for_accession
+from src.analytics.report_profiles import DEFAULT_PROFILE, get_profile, profile_for_accession, segment_ids
 from src.evaluation.report_evaluation import evaluate_report
 from src.evaluation.report_ground_truth import load_report_dataset
 
@@ -25,6 +25,7 @@ SOURCE_LABELS = {'income_statement': 'Income statements · Part I, Item 1',
                  'recast_disclosure': 'Segment recast disclosure · Part I, Item 1',
                  'management_summary': 'Management discussion · Part I, Item 2'}
 NOTE_LABELS = {'gaap_vs_non_gaap': 'Earnings basis',
+               'sales_volume_and_price': 'Sales volume and pricing',
                'azure_growth_vs_cloud_margin': 'Cloud growth and margin',
                'segment_comparability': 'Segment reporting basis',
                'recast_segment_comparability': 'Segment comparability'}
@@ -38,7 +39,7 @@ def digest(payload):
     return hashlib.sha256(payload).hexdigest()
 
 
-def load_evaluated_run(directory):
+def load_evaluated_run(directory, *, allow_pending_review=False):
     directory = Path(directory).resolve()
     blobs = {p.name: p.read_bytes() for p in directory.iterdir() if p.is_file()}
     def read(name):
@@ -50,14 +51,18 @@ def load_evaluated_run(directory):
             ('source.json', 'generated.json', 'evaluation.json', 'run.json'))
         profile = profile_for_accession(source['accession'])
         config = get_profile(profile)
+        draft = allow_pending_review and config.get('contract') == 'm005-v1'
+        if allow_pending_review and not draft:
+            raise GateError('Pending-review draft is supported only for the M005 contract')
         if 'profile.json' in blobs and read('profile.json') != json.loads(json.dumps(config)):
             raise GateError('Saved profile is inconsistent')
         evidence = read('evidence.json')
         if evidence != build_report_evidence(read('sections.json'), source, profile=profile):
             raise GateError('Evidence does not match saved sections')
-        if not saved.get('automatic_pass') or not saved.get('overall_pass'):
+        if not saved.get('automatic_pass') or (not draft and not saved.get('overall_pass')):
             raise GateError('M003 automatic and human review gates must pass')
-        if run.get('status') != 'completed_reviewed' or run.get('overall_pass') is not True:
+        if ((not draft and (run.get('status') != 'completed_reviewed' or run.get('overall_pass') is not True))
+                or (draft and run.get('status') not in {'completed_reviewed', 'completed_pending_review'})):
             raise GateError('Saved run has not completed review')
         if 'profile' in run and run['profile'] != profile:
             raise GateError('Run profile mismatch')
@@ -71,15 +76,17 @@ def load_evaluated_run(directory):
                 raise GateError('Raw response text is inconsistent')
         ground_truth = load_report_dataset(profile, directory / 'ground_truth.json')
         fresh = evaluate_report(report, evidence, ground_truth, source_sha256=source['sha256'],
-                                reviews=read('review.json'), profile=profile)
+                                reviews=read('review.json') if 'review.json' in blobs else None, profile=profile)
         # The approved M002 artifact predates the profile-aware evaluator version only.
-        versions = {'m003-eval-v1'} | ({'m002-eval-v2'} if profile == DEFAULT_PROFILE else set())
+        versions = ({'m005-eval-v3'} if config.get('contract') else {'m003-eval-v1'}) | ({'m002-eval-v2'} if profile == DEFAULT_PROFILE else set())
         if saved.get('evaluation_version') not in versions:
             raise GateError('Unknown evaluation version')
-        if not fresh['overall_pass'] or any(saved.get(k) != v for k, v in fresh.items()
-                                            if k != 'evaluation_version'):
+        if (not fresh['automatic_pass'] or (not draft and not fresh['overall_pass'])
+                or any(r['status'] == 'fail' for r in fresh['manual_reviews'])
+                or run.get('overall_pass') != fresh['overall_pass']
+                or any(saved.get(k) != v for k, v in fresh.items() if k != 'evaluation_version')):
             raise GateError('Saved evaluation/reviews are stale or fail read-only evaluation')
-        for item in report['metrics'] + report['notes']:
+        for item in report['metrics'] + report['notes'] + report.get('reconciliation', []):
             for cite in item['citations']:
                 e = next(e for e in evidence if e['evidence_id'] == cite['evidence_id'])
                 if cite['quote'] not in e['text']:
@@ -151,7 +158,8 @@ def build_presentation(bundle):
                for i, e in enumerate(bundle['evidence'], 1)}
     refs = {s['evidence_id']: ref for ref, s in sources.items()}
     claims = {}
-    for item in report['metrics'] + report['notes']:
+    reconciliation_claims = [{**r, 'id': 'reconciliation:' + r['label']} for r in report.get('reconciliation', [])]
+    for item in report['metrics'] + report['notes'] + reconciliation_claims:
         citations = []
         for cite in item['citations']:
             span_ids = [s['span_id'] for s in bundle['registry']['spans']
@@ -161,12 +169,13 @@ def build_presentation(bundle):
                 raise GateError('Citation cannot be mapped to a claim-bound source span')
             citations.append({**cite, 'span_ids': span_ids, 'reference': refs[cite['evidence_id']]})
         claims[item['id']] = {'citations': citations}
-    metrics = [{**m, 'label': LABELS.get(m['id'], config['metrics'][m['id']][0]),
+    display_labels = config.get('presentation', {}).get('labels', LABELS)
+    metrics = [{**m, 'label': display_labels.get(m['id'], config['metrics'][m['id']][0]),
                 'display_current': money(m['current'], m['unit']),
                 'display_prior': money(m['prior'], m['unit']),
                 'display_yoy': percent(m['yoy_percent'])} for m in report['metrics']]
     by_id = {m['id']: m for m in metrics}
-    segments = [m for m in metrics if m['id'].endswith('_revenue')]
+    segments = [m for m in metrics if m['id'] in segment_ids(config)]
     fastest = leaders(segments)
     labels = [by_id[mid]['label'] for mid in fastest]
     names = (' and '.join(labels) if len(labels) < 3 else
@@ -178,6 +187,9 @@ def build_presentation(bundle):
     revenue_amount = revenue['display_current'].removesuffix('B') + ' billion'
     summary = (f"Microsoft reported revenue of {revenue_amount}, {direction} year over year, "
                f"while operating income {movement(operating['yoy_percent'])}.")
+    if config.get('contract'):
+        summary = (f"{config['display_company']} reported sales and revenues of {revenue_amount}, {direction} year over year, "
+                   f"while operating profit {movement(operating['yoy_percent'])}.")
     if fastest:
         growth = abs(number(by_id[fastest[0]]['yoy_percent']))
         growth_description = (f'revenue up {growth:.1f}%' if growth else
@@ -189,16 +201,22 @@ def build_presentation(bundle):
                         f'each with {growth_description}.')
     else:
         summary += ' No configured segment recorded revenue growth.'
-    note_ids = ['azure_growth_vs_cloud_margin']
+    note_ids = [config['presentation']['takeaway']] if config.get('presentation') else ['azure_growth_vs_cloud_margin']
     comparison = earnings_comparison(operating, revenue)
+    if config.get('contract'):
+        comparison = comparison.replace('Operating income', 'Operating profit').replace('revenue', 'sales and revenues')
     view = {'version': VERSION, 'report': report['report'], 'metrics': metrics,
             'notes': report['notes'], 'takeaway_ids': note_ids, 'fastest_segment_ids': fastest,
             'summary': summary, 'earnings_comparison': comparison,
             'comparison_claim_ids': ['operating_income', 'revenue'],
             'sources': sources, 'claims': claims,
             'summary_claim_ids': ['revenue', 'operating_income'] + [m['id'] for m in segments],
-            'm003_automatic_pass': True, 'm003_overall_pass': True,
+            'm003_automatic_pass': bundle['evaluation']['automatic_pass'], 'm003_overall_pass': bundle['evaluation']['overall_pass'],
             'm004_review_status': 'pending_manual_review'}
+    if config.get('contract'):
+        view.update(version='m005-presentation-v1', company=config['display_company'], headline_ids=list(display_labels),
+                    segment_ids=segment_ids(config),
+                    reconciliation=report['reconciliation'], contract=config['contract'])
     return copy.deepcopy(view)
 
 
@@ -226,29 +244,43 @@ def references(view, ids):
 def render_main(view):
     meta = view['report']
     metrics = {m['id']: m for m in view['metrics']}
-    lines = [f"# Microsoft (MSFT) · {meta['fiscal_period']}",
+    company = view.get('company', 'Microsoft')
+    status = ('**Automated draft · Semantic and M004 presentation review pending.** Automatic checks passed; human approval is required.'
+              if view.get('contract') and not view['m003_overall_pass'] else
+              '**Automated draft · M004 presentation review pending.** M003 automatic checks and qualitative reviews passed.')
+    lines = [f"# {company} ({meta['ticker']}) · {meta['fiscal_period']}",
              f"{meta['period_start']} to {meta['period_end']}; compared with {meta['prior_start']} to {meta['prior_end']}.",
-             '**Automated draft · M004 presentation review pending.** M003 automatic checks and qualitative reviews passed.',
+             status,
              '## Executive summary', text(view['summary']) + ' ' + references(view, view['summary_claim_ids']),
              '## Headline financials', 'GAAP. B = USD billions, rounded to one decimal; EPS = USD per share. YoY is calculated from exact source values.',
              '| Metric | Current | YoY |', '|---|---:|---:|']
-    for mid in LABELS:
+    for mid in view.get('headline_ids', LABELS):
         m = metrics[mid]
         lines.append(f"| {m['label']} | **{m['display_current']}** | {m['display_yoy']} |")
-    lines += [references(view, list(LABELS)), '## Investor takeaways']
+    lines += [references(view, list(view.get('headline_ids', LABELS))), '## Investor takeaways']
     lines.append('- **Operating performance:** ' + text(view['earnings_comparison']) + ' ' +
                  references(view, view['comparison_claim_ids']))
     for nid in view['takeaway_ids']:
         note = next(n for n in view['notes'] if n['id'] == nid)
         lines.append(f"- **{NOTE_LABELS[nid]}:** {approved_note_text(note)} {references(view, [nid])}")
     lines += ['## Segment revenue', '| Segment | Current | Prior | YoY |', '|---|---:|---:|---:|']
-    segments = [m for m in view['metrics'] if m['id'].endswith('_revenue')]
+    if view.get('contract'):
+        lines.insert(-2, 'Segment totals include intersegment activity; 2025 is retrospectively adjusted. These totals do not sum directly to consolidated sales and revenues.')
+    segments = [m for m in view['metrics'] if (m['id'] in view['segment_ids'] if 'segment_ids' in view else m['id'].endswith('_revenue'))]
     for m in segments:
         lines.append(f"| {m['label']} | {m['display_current']} | {m['display_prior']} | {m['display_yoy']} |")
     basis = next(n['id'] for n in view['notes'] if 'comparability' in n['id'])
-    lines += [references(view, [m['id'] for m in segments] + [basis]),
+    lines += [references(view, [m['id'] for m in segments] + [basis])]
+    if view.get('reconciliation'):
+        lines += ['## Revenue reconciliation', 'USD millions, exact values. External includes the Financial Products affiliate revenues described in Note 16 footnote 1.',
+                  '| Component | External current / prior | Intersegment current / prior | Total current / prior |',
+                  '|---|---:|---:|---:|']
+        for r in view['reconciliation']:
+            lines.append('| ' + r['label'] + ' | ' + ' | '.join(' / '.join(r[k]) for k in ('external', 'intersegment', 'total')) + ' |')
+        lines.append(references(view, ['reconciliation:' + r['label'] for r in view['reconciliation']]))
+    lines += [
               '[Exact financial values, reporting basis, all approved notes, and source quotations](supporting_detail.md).',
-              '## Sources', f"Microsoft Form {meta['form']}, accession {meta['accession']}."]
+              '## Sources', f"{company} Form {meta['form']}, accession {meta['accession']}."]
     lines += [f"- [{s['label']}][{ref}]" for ref, s in view['sources'].items()]
     lines += [f"[{ref}]: {s['url']} \"{s['label']}\"" for ref, s in view['sources'].items()]
     formatted = []
@@ -261,7 +293,10 @@ def render_main(view):
                   or i == 2):
             formatted.append('')
         formatted.append(line)
-    return '\n'.join(formatted) + '\n'
+    result = '\n'.join(formatted) + '\n'
+    if view.get('contract') and not view['m003_overall_pass']:
+        result = result.replace('all approved notes', 'all pending-review notes')
+    return result
 
 
 def render_details(view):
@@ -271,9 +306,14 @@ def render_details(view):
         lines.append(f"| {m['label']} | {m['current']} | {m['prior']} | {m['yoy_percent']}% | {m['unit']} | {m['gaap_status']} |")
     for note in view['notes']:
         lines += [f"\n## {NOTE_LABELS[note['id']]}", '', approved_note_text(note), '']
+    if view.get('reconciliation'):
+        lines += ['\n## Revenue reconciliation', 'Exact USD millions; each cell is current / prior.',
+                  '| Component | External | Intersegment | Total |', '|---|---:|---:|---:|']
+        for r in view['reconciliation']:
+            lines.append('| ' + r['label'] + ' | ' + ' | '.join(' / '.join(r[k]) for k in ('external', 'intersegment', 'total')) + ' |')
     lines += ['\n## Exact saved source quotations', 'These are saved extracted-text quotations, not raw HTML markup.']
     for mid, claim in view['claims'].items():
-        label = next((m['label'] for m in view['metrics'] if m['id'] == mid), NOTE_LABELS.get(mid))
+        label = next((m['label'] for m in view['metrics'] if m['id'] == mid), NOTE_LABELS.get(mid, mid))
         lines.append(f'\n### {label}\n')
         for cite in claim['citations']:
             s = view['sources'][cite['reference']]
@@ -282,9 +322,9 @@ def render_details(view):
     return '\n'.join(lines) + '\n'
 
 
-def write_presentation(input_dir, output_root):
+def write_presentation(input_dir, output_root, *, allow_pending_review=False):
     from src.evaluation.investor_report import evaluate_presentation
-    bundle = load_evaluated_run(input_dir)
+    bundle = load_evaluated_run(input_dir, allow_pending_review=allow_pending_review)
     view = build_presentation(bundle)
     report, detail = render_main(view), render_details(view)
     evaluation = evaluate_presentation(bundle, view, report, detail)
@@ -301,7 +341,7 @@ def write_presentation(input_dir, output_root):
     output = root / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '_' + uuid4().hex[:8])
     output.mkdir(parents=True, exist_ok=False)
     files = {'presentation.json': view, 'supporting_detail.json': view['claims'],
-             'input_manifest.json': {'renderer_version': VERSION, 'input_directory': str(source),
+             'input_manifest.json': {'renderer_version': view['version'], 'input_directory': str(source),
                  'profile': bundle['profile'], 'input_sha256': bundle['hashes']},
              'm003_gate.json': bundle['evaluation'], 'presentation_evaluation.json': evaluation,
              'review_template.json': {'status': 'pending_manual_review', 'reviewer': '', 'rationale': '',

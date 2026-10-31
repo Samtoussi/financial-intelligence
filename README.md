@@ -229,6 +229,22 @@ No SEC or model calls are made. New artifacts are saved under `evals/reports/m00
 Exit code 2 indicates automatic checks passed with presentation review pending.
 See [M004-A workflow, artifacts, tests, and limitations](evals/M004.md).
 
+### V4 M005: Caterpillar quarterly extension (approved)
+
+The shared quarterly pipeline now supports the pinned Caterpillar 2026 Q1 10-Q
+through deterministic financial assembly, explicit segment table bindings, and
+an exact external/intersegment/consolidated revenue reconciliation. The unchanged
+second CAT response passes `m005-eval-v3`: 16 financial values, eight YoY changes,
+eight source-supported pairs, 48 reconciliation values and 12 monetary mentions.
+Sam approved the oracle, all three semantic cases and the investor presentation
+based on reviewed artifacts and documented independent SEC verification.
+
+See [final verification and formal approval](evals/M005_FINAL_VERIFICATION.md)
+and [source qualification and implementation history](evals/M005.md). Historical
+pending evaluations and the original defective response remain unchanged; approval
+is recorded separately. JPM quarterly reporting and Streamlit report integration
+are not implemented.
+
 ### Existing platform limitations
 
 - Three companies are supported: Microsoft, JPMorgan Chase, and Caterpillar. Financial analytics focus on annual revenue and YoY growth.

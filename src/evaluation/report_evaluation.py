@@ -93,7 +93,7 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
             integrity_errors.append("Missing or duplicate evidence ID")
             continue
         if (e.get("accession") != report_identity["accession"] or e.get("source_url") != report_identity["source_url"]
-                or e.get("ticker") != "MSFT" or e.get("form") != "10-Q"
+                or e.get("ticker") != report_identity['ticker'] or e.get("form") != report_identity['form']
                 or not re.fullmatch(r"[0-9a-f]{64}", source_sha256 or "")
                 or e.get("source_sha256") != source_sha256
                 or not isinstance(text, str) or not text.strip()
@@ -154,7 +154,23 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
             if m.get(field) != expected[field]:
                 metadata_errors.append(f"Metric mismatch: {mid}.{field}")
         supported = False
-        for e, quote in citations(m, mid):
+        valid_citations = citations(m, mid)
+        if config.get('bindings'):
+            from src.analytics.report_tables import selected_pair
+            binding = config['bindings'][mid]
+            for e, _ in valid_citations:
+                if e['label'] != binding['window']:
+                    continue
+                try:
+                    pair, ranges, _ = selected_pair(e['text'], metrics[mid][0], binding, config)
+                    supported = (pair == [decimal_value(m.get(p)) for p in ('current', 'prior')]
+                        and all(any(cited['evidence_id'] == e['evidence_id'] and e['text'][a:b] in q
+                                    for cited, q in valid_citations) for a, b in ranges))
+                except ValueError:
+                    supported = False
+                if supported:
+                    break
+        for e, quote in ([] if config.get('bindings') else valid_citations):
             source_row = _source_row(e, mid, profile=profile)
             if source_row is None:
                 continue
@@ -171,6 +187,27 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
             support_errors.append(f"No labeled source row supports pair: {mid}")
         details.append({"id": mid, "values": values_ok, "yoy_pass": growth_ok,
                         "expected_yoy_percent": expected_yoy, "table_support_pass": supported})
+    reconciliation_result = None
+    if config.get('reconciliation_rows'):
+        from src.analytics.report_tables import reconciliation_values, check_reconciliation
+        rows = report.get('reconciliation', [])
+        expected_rows = [{k: r[k] for k in ('label', 'external', 'intersegment', 'total')} for r in ground_truth['reconciliation']]
+        try:
+            actual_rows = [{k: r[k] for k in ('label', 'external', 'intersegment', 'total')} for r in rows]
+            if actual_rows != expected_rows:
+                raise ValueError('Oracle reconciliation mismatch')
+            check_reconciliation(rows, [by_id['revenue'][p] for p in ('current', 'prior')])
+            for r in rows:
+                supported = False
+                for e, q in citations(r, 'reconciliation:' + r['label']):
+                    if e['label'] == 'segment_table' and q == e['text'] and reconciliation_values(e['text'], config) == expected_rows:
+                        supported = True
+                if not supported:
+                    raise ValueError('Unsupported reconciliation row')
+            reconciliation_result = {'passed': 48, 'total': 48, 'identities_pass': True}
+        except (ValueError, KeyError, TypeError):
+            support_errors.append('Reconciliation oracle/source/identity mismatch')
+            reconciliation_result = {'passed': 0, 'total': 48, 'identities_pass': False}
     notes = report.get("notes", [])
     notes = notes if isinstance(notes, list) else []
     notes_by_id = {}
@@ -180,12 +217,19 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
         else:
             notes_by_id[note["id"]] = note
     manual = []
+    monetary_checks = []
     reviews = reviews or {}
     for nid in note_ids:
         note = notes_by_id.get(nid, {})
         cited = citations(note, nid)
         if not isinstance(note.get("text"), str) or not note["text"].strip():
             failures.append(f"Missing note text: {nid}")
+        elif config.get('contract') == 'm005-v1':
+            from src.analytics.narrative_money import validate_monetary_narrative
+            check = validate_monetary_narrative(note['text'], [quote for _, quote in cited])
+            monetary_checks.append({'note_id': nid, **check})
+            if not check['automatic_pass']:
+                support_errors.append(f'Unsupported narrative monetary units: {nid}')
         review = reviews.get(nid, {})
         status = review.get("status", "pending_manual_review")
         if status not in {"pass", "fail", "pending_manual_review"}:
@@ -198,13 +242,13 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
             and set(review["evidence_ids"]).issubset({e["evidence_id"] for e, _ in cited})
         ):
             status = "pending_manual_review"
-        manual.append({"id": nid, "status": status, "rubric": RUBRIC.get(nid, config["topics"][nid]),
+        manual.append({"id": nid, "status": status, "rubric": config['topics'][nid] if config.get('contract') else RUBRIC.get(nid, config["topics"][nid]),
                        "reviewer": review.get("reviewer"), "rationale": review.get("rationale"),
                        "evidence_ids": [e["evidence_id"] for e, _ in cited],
                        "instruction": "Compare every assertion with the quoted disclosure; a matching quote alone is insufficient."})
     automatic_ok = not (failures or integrity_errors or quote_errors or metadata_errors or support_errors)
-    return {
-        "evaluation_version": "m003-eval-v1",
+    result = {
+        "evaluation_version": "m005-eval-v3" if config.get('contract') else "m003-eval-v1",
         "number_normalization": "Correctly grouped thousands separators are removed before exact Decimal comparison; no numeric tolerance is used.",
         "financial_values": {"passed": value_passed, "total": 2 * len(metrics)},
         "yoy_changes": {"passed": yoy_passed, "total": len(metrics)},
@@ -220,3 +264,9 @@ def evaluate_report(report, evidence, ground_truth, *, source_sha256, reviews=No
         "limitations": "Table-row checks support the numeric pairs only. Quote membership and source hashes "
                       "do not establish semantic correctness of interpretation notes. Pending reviews are not passes.",
     }
+    if reconciliation_result is not None:
+        result['reconciliation'] = reconciliation_result
+    if config.get('contract') == 'm005-v1':
+        result['narrative_monetary_units'] = {'automatic_pass': all(c['automatic_pass'] for c in monetary_checks),
+                                            'notes': monetary_checks}
+    return result

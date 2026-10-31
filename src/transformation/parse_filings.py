@@ -69,7 +69,7 @@ def load_latest_snapshot(
     return payload, metadata
 
 
-def quarterly_boundaries(soup: BeautifulSoup) -> list[Tag]:
+def quarterly_boundaries(soup: BeautifulSoup, *, cat_layout=False) -> list[Tag]:
     """Bounded Microsoft layout: resolve the three Part I TOC destinations.
 
     Following TOC links avoids repeated page headers and Part II item numbers.
@@ -82,8 +82,13 @@ def quarterly_boundaries(soup: BeautifulSoup) -> list[Tag]:
     )
     result = []
     for title in titles:
-        links = [a for a in soup.find_all("a", href=True)
-                 if normalized_heading(a.get_text(" ", strip=True)).replace("'", "’") == title]
+        def matches(a):
+            label = normalized_heading(a.get_text(" ", strip=True)).replace("'", "’")
+            if cat_layout:
+                # Observed CAT TOC; the downloaded document contains U+FFFD here.
+                label = label.replace('\ufffd', '’')
+            return label == title
+        links = [a for a in soup.find_all("a", href=True) if matches(a)]
         destinations = {a["href"][1:] for a in links if a["href"].startswith("#")}
         if len(destinations) != 1:
             raise ValueError(f"Ambiguous 10-Q boundary: {title}")
@@ -351,9 +356,9 @@ def parse_filing(
     soup = parse_html(payload)
 
     if form == "10-Q":
-        if ticker != "MSFT":
-            raise ValueError("10-Q extraction currently supports MSFT only")
-        starts = quarterly_boundaries(soup)
+        if ticker not in {"MSFT", "CAT"}:
+            raise ValueError("10-Q extraction currently supports MSFT and CAT only")
+        starts = quarterly_boundaries(soup, cat_layout=ticker == 'CAT')
         records = []
         for i, item in enumerate(("I.1", "I.2")):
             text = quarterly_text(soup, starts[i], starts[i + 1])

@@ -1,0 +1,25 @@
+{
+  "notes": [
+    {
+      "id": "gaap_vs_non_gaap",
+      "text": "GAAP profit per share (diluted) was $5.47 in Q1 2026 and $4.20 in Q1 2025. Adjusted (non‑GAAP) profit per share, excluding the item shown in the table, was $5.54 in 2026 and $4.25 in 2025. The disclosed restructuring (income) costs were $41 in 2026 (a $0.07 per‑share impact) and $33 in 2025 (a $0.05 per‑share impact), and those amounts are the adjustment items referenced.",
+      "span_ids": [
+        "982c2366d0403f9b922fd4e85159956b"
+      ]
+    },
+    {
+      "id": "segment_comparability",
+      "text": "Segment information for 2025 has been retrospectively adjusted to conform to the 2026 presentation. Effective January 1, 2026, responsibility for diesel‑electric, hybrid and battery‑electric locomotives and other rail‑related products and services moved from Power & Energy to Resource Industries.",
+      "span_ids": [
+        "28d225672b5792d5b0e4f2134176c869"
+      ]
+    },
+    {
+      "id": "sales_volume_and_price",
+      "text": "Consolidated total sales and revenues increased $3.166 billion (22%) year‑over‑year; the increase was primarily due to higher sales volume of $2.3 billion and favorable price realization of $426 million.",
+      "span_ids": [
+        "648d180d5d2fc87fd227f0bf5bf322a7"
+      ]
+    }
+  ]
+}

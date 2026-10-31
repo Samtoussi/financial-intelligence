@@ -91,6 +91,22 @@ def prepare(evidence, profile):
         return s
 
     for mid, (label, unit, basis) in config['metrics'].items():
+        if config.get('bindings'):
+            from src.analytics.report_tables import selected_pair
+            binding = config['bindings'][mid]
+            e = labels[binding['window']]
+            pair, ranges, tokens = selected_pair(e['text'], label, binding, config)
+            selected = [span(e, start, end, mid) for start, end in ranges]
+            for p, token, value, s in zip(('current', 'prior'), tokens, pair,
+                                         selected if len(selected) == 2 else selected * 2):
+                values.append({'metric_id': mid, 'period': p, 'value': str(value),
+                    'source_token': token, 'span_id': s['span_id'], 'evidence_id': s['evidence_id'],
+                    'source_sha256': s['source_sha256'], 'accession': s['accession'],
+                    'column_year': identity['period_end' if p == 'current' else 'prior_end'][:4]})
+            metrics.append({'id': mid, 'current': str(pair[0]), 'prior': str(pair[1]),
+                'yoy_percent': growth(*pair), 'unit': unit, 'gaap_status': basis,
+                'citations': [{'evidence_id': s['evidence_id'], 'quote': s['quote']} for s in selected]})
+            continue
         segment = mid.endswith('_revenue')
         e = labels['segment_table' if segment else 'income_statement']
         text = e['text']
@@ -134,10 +150,25 @@ def prepare(evidence, profile):
                         'citations':[{'evidence_id':s['evidence_id'],'quote':s['quote']}],
                         })
     for nid in config['topics']:
+        if config.get('topic_windows'):
+            for name in config['topic_windows'][nid]:
+                e = labels[name]
+                span(e, 0, len(e['text']), nid)
+            continue
         name = ('recast_disclosure' if 'recast_disclosure' in labels else 'segment_basis') if 'comparability' in nid else 'management_summary'
         e = labels[name]
         span(e,0,len(e['text']),nid)
-    return {'metrics':metrics,'spans':spans,'numeric_provenance':values}
+    result = {'metrics':metrics,'spans':spans,'numeric_provenance':values}
+    if config.get('reconciliation_rows'):
+        from src.analytics.report_tables import reconciliation_values, check_reconciliation
+        e = labels['segment_table']
+        rows = reconciliation_values(e['text'], config)
+        check_reconciliation(rows, [metrics[0]['current'], metrics[0]['prior']])
+        for r in rows:
+            s = span(e, 0, len(e['text']), 'reconciliation:' + r['label'])
+            r['citations'] = [{'evidence_id': s['evidence_id'], 'quote': s['quote']}]
+        result['reconciliation'] = rows
+    return result
 
 
 def assemble(raw, evidence, profile, prepared=None):
@@ -161,11 +192,19 @@ def assemble(raw, evidence, profile, prepared=None):
             if s is None or s['claim_id'] != nid:
                 raise ValueError('Unknown or unsupported claim span ID')
             citations.append({'evidence_id':s['evidence_id'],'quote':s['quote']})
+        if config.get('contract') == 'm005-v1':
+            from src.analytics.narrative_money import validate_monetary_narrative
+            check = validate_monetary_narrative(note['text'], [c['quote'] for c in citations])
+            if not check['automatic_pass']:
+                raise ValueError('Unsupported narrative monetary units: ' + nid)
         notes.append({'id':nid,'text':note['text'],'citations':citations})
     if len(notes)!=len(config['topics']):
         raise ValueError('Missing interpretation notes')
     keys=('ticker','form','accession','fiscal_period','period_start','period_end','prior_start','prior_end')
-    return {'report':{k:config['report'][k] for k in keys},'metrics':expected['metrics'],'notes':notes}
+    result = {'report':{k:config['report'][k] for k in keys},'metrics':expected['metrics'],'notes':notes}
+    if 'reconciliation' in expected:
+        result['reconciliation'] = expected['reconciliation']
+    return result
 
 
 def generate(evidence, profile, client=None, model=MODEL, save=None):
@@ -178,7 +217,8 @@ def generate(evidence, profile, client=None, model=MODEL, save=None):
     config=get_profile(profile)
     client=client or OpenAI(timeout=180.0,max_retries=0)
     started=time.perf_counter()
-    response=client.responses.create(model=model,instructions=INSTRUCTIONS,
+    instructions = instructions_for(profile)
+    response=client.responses.create(model=model,instructions=instructions,
         input=json.dumps({'financial_metrics':prepared['metrics'],'spans':prepared['spans'],
                           'interpretation_topics':[
                               {'id':nid,'question':question,'allowed_span_ids':allowed[nid]}
@@ -194,6 +234,21 @@ def generate(evidence, profile, client=None, model=MODEL, save=None):
     if save: save('raw_llm.json',raw)
     report=assemble(raw,evidence,profile,prepared)
     usage=getattr(response,'usage',None)
-    return report,{'model':model,'prompt_version':PROMPT_VERSION,'latency_seconds':round(time.perf_counter()-started,3),
+    return report,{'model':model,'prompt_version':prompt_version(profile),'latency_seconds':round(time.perf_counter()-started,3),
                    'response_id':getattr(response,'id',None),
                    'token_usage':usage.model_dump() if hasattr(usage,'model_dump') else None}
+
+
+def instructions_for(profile):
+    if not get_profile(profile).get('contract'):
+        return INSTRUCTIONS
+    return INSTRUCTIONS.replace('segment reporting basis, and Azure growth from Cloud margin.',
+        'segment reporting basis, and disclosed volume/price contributions from inferred causes.') + (
+        '\nEvery monetary amount in a note must preserve its cited source scale and dimension. '
+        'A table header in millions does not qualify standalone prose: write $41 million, not $41. '
+        'Distinguish aggregate USD amounts from USD per share; explicitly qualify per-share adjustments. '
+        'Never drop thousand/million/billion units. Do not include an amount if its units are uncertain.')
+
+
+def prompt_version(profile):
+    return 'm005-assembly-v2' if get_profile(profile).get('contract') else PROMPT_VERSION

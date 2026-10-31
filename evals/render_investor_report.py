@@ -13,9 +13,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run', type=Path, required=True)
     parser.add_argument('--output-root', type=Path, default=ROOT / 'evals/reports/m004')
+    parser.add_argument('--pending-review-draft', action='store_true',
+                        help='M005 only: render an automatically passing draft with human reviews visibly pending')
     args = parser.parse_args(argv)
     try:
-        directory, result = write_presentation(args.run, args.output_root)
+        directory, result = write_presentation(args.run, args.output_root,
+                                             allow_pending_review=args.pending_review_draft)
     except (ValueError, OSError) as exc:
         print(f'M004 presentation blocked: {exc}', file=sys.stderr)
         return 1

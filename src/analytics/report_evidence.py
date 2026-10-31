@@ -66,6 +66,13 @@ def build_report_evidence(sections: list[dict], metadata: dict, *, profile=DEFAU
                           if c["start_char"] < end and c["end_char"] > start],
             "text": text,
         })
+    if config.get('bindings'):
+        from src.analytics.report_tables import selected_pair, reconciliation_values, check_reconciliation
+        labels = {e['label']: e for e in evidence}
+        pairs = {mid: selected_pair(labels[b['window']]['text'], metrics[mid][0], b, config)[0]
+                 for mid, b in config['bindings'].items()}
+        check_reconciliation(reconciliation_values(labels['segment_table']['text'], config), pairs['revenue'])
+        return evidence
     # Require the metric labels, column periods and units in their own table context.
     for label, rows in (("income_statement", list(metrics)[:4]),
                         ("segment_table", list(metrics)[4:])):

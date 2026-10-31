@@ -1,4 +1,4 @@
-﻿"""Two observed layouts: synthetic regressions plus optional cached SEC verification."""
+"""Two observed layouts: synthetic regressions plus optional cached SEC verification."""
 import hashlib
 import json
 import re
@@ -44,7 +44,7 @@ def controlled_report(profile, evidence):
             'metrics': entries, 'notes': notes}
 
 
-@pytest.fixture(params=list(PROFILES))
+@pytest.fixture(params=[key for key in PROFILES if key.startswith('msft_')])
 def case(request, tmp_path, monkeypatch):
     profile = request.param
     c = get_profile(profile)
@@ -189,7 +189,7 @@ def test_saved_run_infers_profile_and_keeps_output(case, tmp_path, monkeypatch):
     assert run_report.main(['--evaluate-run',str(directory),'--profile',wrong]) == 1
 
 
-@pytest.mark.parametrize('profile', list(PROFILES))
+@pytest.mark.parametrize('profile', [key for key in PROFILES if key.startswith('msft_')])
 def test_cached_sec_tables_independently_match_oracle(profile):
     c = get_profile(profile)
     paths = sorted((Path('data/raw/sec/filings/MSFT')/c['report']['accession']).glob('*.html'))

@@ -1,6 +1,7 @@
 """Profile-aware report oracle validation. The separate M001 validator is unchanged."""
 from decimal import Decimal
 from pathlib import Path
+import re
 from src.analytics.report_profiles import DEFAULT_PROFILE, get_profile
 from src.evaluation.ground_truth import load_dataset, number, require, citation, yoy
 
@@ -19,15 +20,15 @@ def validate_report_dataset(data, profile=DEFAULT_PROFILE):
 
 def _validate(data, config):
     report, metrics = config["report"], config["metrics"]
-    require(data["schema_version"] == 1 and data["milestone"] == ("M001" if config["id"] == DEFAULT_PROFILE else "M003"), "invalid schema")
+    require(data["schema_version"] == 1 and data["milestone"] == ("M005" if config.get('contract') else "M001" if config["id"] == DEFAULT_PROFILE else "M003"), "invalid schema")
     expected = {k:report[k] for k in ("form", "fiscal_period", "period_end", "filing_date", "accession", "source_url")}
-    expected.update(company="Microsoft Corporation", cik=f"{report['cik']:010d}")
+    expected.update(company=config.get('company', "Microsoft Corporation"), cik=f"{report['cik']:010d}")
     require(all(data["report"].get(k) == v for k,v in expected.items()), "inconsistent report metadata")
     citation(data["report"]["filing_date_source"], ("url", "section", "location"),
              "https://microsoft.gcs-web.com/financial-information/sec-filings" if config["id"] == DEFAULT_PROFILE else report["source_url"].replace(report["document"], report["accession"] + "-index.html"))
     periods = {
         "current": {"fiscal_period":report["fiscal_period"], "start":report["period_start"], "end":report["period_end"]},
-        "prior": {"fiscal_period":f"FY{int(report['fiscal_period'][2:6])-1} Q1", "start":report["prior_start"], "end":report["prior_end"]},
+        "prior": {"fiscal_period":config.get('prior_fiscal_period', f"FY{int(report['fiscal_period'][2:6])-1} Q1"), "start":report["prior_start"], "end":report["prior_end"]},
     }
     require(data["periods"] == periods, "inconsistent report periods")
     entries = data["metrics"]
@@ -40,8 +41,10 @@ def _validate(data, config):
         citation(m["source"], ("url", "section", "table", "row", "columns"), report["source_url"])
         require(type(m["source"].get("page")) is int and m["source"]["page"] > 0, "missing citation page")
         expected_row = metrics[mid][0] + " / Revenue" if mid.endswith("_revenue") else metrics[mid][0]
-        require(m["source"]["row"] == ("Earnings per share / Diluted" if mid == "diluted_eps" else expected_row), "incorrect source row")
-        require(m["source"]["columns"] == f"Three Months Ended September 30: {report['period_end'][:4]} / {report['prior_end'][:4]}", "incorrect source columns")
+        require(m["source"]["row"] == (metrics[mid][0] if config.get('bindings') else "Earnings per share / Diluted" if mid == "diluted_eps" else expected_row), "incorrect source row")
+        columns = (f"Three Months Ended March 31: {report['period_end'][:4]} / {report['prior_end'][:4]}" +
+                   ('; Total Sales and Revenues (including intersegment)' if config['bindings'][mid]['role'] == 'segment' else '')) if config.get('bindings') else f"Three Months Ended September 30: {report['period_end'][:4]} / {report['prior_end'][:4]}"
+        require(m["source"]["columns"] == columns, "incorrect source columns")
         values[mid] = {}
         for period in periods:
             obs = m[period]
@@ -50,7 +53,21 @@ def _validate(data, config):
             require(value == value.quantize(Decimal('0.01' if mid == 'diluted_eps' else '1')), "invalid value precision for unit")
             values[mid][period] = value
         changes[mid] = yoy(m["current"]["value"], m["prior"]["value"])
-    for period in periods:
+    if config.get('reconciliation_rows'):
+        from src.analytics.report_tables import check_reconciliation
+        rows = data['reconciliation']
+        require([r['label'] for r in rows] == config['reconciliation_rows'], 'incorrect reconciliation rows')
+        for r in rows:
+            citation(r['source'], ('url', 'section', 'table', 'row', 'columns'), report['source_url'])
+            require(r['source']['row'] == r['label'] and r['source']['page'] == 27, 'incorrect reconciliation location')
+            for column in ('external', 'intersegment', 'total'):
+                require(len(r[column]) == 2 and all(isinstance(v, str) and re.fullmatch(r'-?\d+', v) for v in r[column]), 'invalid reconciliation values')
+        check_reconciliation(rows, [values['revenue'][p] for p in periods])
+        for mid, b in config['bindings'].items():
+            if b['role'] == 'segment':
+                r = next(r for r in rows if r['label'] == metrics[mid][0])
+                require([values[mid][p] for p in periods] == [Decimal(v) for v in r['total']], 'segment oracle mismatch')
+    for period in (() if config.get('reconciliation_rows') else periods):
         require(sum(values[mid][period] for mid in metrics if mid.endswith("_revenue")) == values["revenue"][period], "incorrect segment total")
         require(values["net_income"][period] <= values["operating_income"][period] <= values["revenue"][period], "inconsistent income ordering")
     cases = data["qualitative_review_cases"]

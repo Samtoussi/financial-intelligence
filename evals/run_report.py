@@ -63,19 +63,22 @@ def run_baseline(*, snapshot_path=None, download=False, client=None, model=MODEL
     assembly_mode = generation_mode == report_assembly.MODE
     config = get_profile(profile)
     report = config["report"]
-    reports_dir = reports_dir or ROOT / ("evals/reports/m002" if profile == DEFAULT_PROFILE and not assembly_mode else "evals/reports/m003")
+    ticker = report["ticker"]
+    if config.get("contract") and not assembly_mode:
+        raise ValueError("New profiles require deterministic assembly mode m003-v2")
+    reports_dir = reports_dir or ROOT / ("evals/reports/m005" if config.get('contract') else "evals/reports/m002" if profile == DEFAULT_PROFILE and not assembly_mode else "evals/reports/m003")
     os.chdir(ROOT)
     load_dotenv(ROOT / ".env")
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "_" + uuid4().hex[:8]
     run_dir = Path(reports_dir) / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
-    manifest = {"run_id": run_id, "model": model, "prompt_version": report_assembly.PROMPT_VERSION if assembly_mode else prompt_version(profile), "profile": profile,
+    manifest = {"run_id": run_id, "model": model, "prompt_version": report_assembly.prompt_version(profile) if assembly_mode else prompt_version(profile), "profile": profile,
                 "status": "started", "live_model_call_attempted": False}
     if assembly_mode:
         manifest["generation_mode"] = generation_mode
     write_json(run_dir / "run.json", manifest)
     write_json(run_dir / "profile.json", config)
-    (run_dir / "instructions.txt").write_text(report_assembly.INSTRUCTIONS if assembly_mode else instructions_for(profile), encoding="utf-8")
+    (run_dir / "instructions.txt").write_text(report_assembly.instructions_for(profile) if assembly_mode else instructions_for(profile), encoding="utf-8")
     if not assembly_mode:
         write_json(run_dir / "output_schema.json", output_schema(profile))
     try:
@@ -90,19 +93,19 @@ def run_baseline(*, snapshot_path=None, download=False, client=None, model=MODEL
                 "cik", "form", "accession", "filing_date", "document", "source_url",
             )) or filing["report_date"] != report["period_end"]:
                 raise ValueError("SEC discovery disagrees with pinned report")
-            snapshot_path = save_snapshot("MSFT", fetch(filing["source_url"], user_agent), filing)
-        _, metadata = load_latest_snapshot("MSFT", form="10-Q", accession=report["accession"],
+            snapshot_path = save_snapshot(ticker, fetch(filing["source_url"], user_agent), filing)
+        _, metadata = load_latest_snapshot(ticker, form="10-Q", accession=report["accession"],
                                            snapshot_path=snapshot_path)
         # Resolve once to an explicit path before any subsequent processing.
         if snapshot_path is None:
-            snapshot_path = ROOT / "data/raw/sec/filings/MSFT" / report["accession"] / (
+            snapshot_path = ROOT / "data/raw/sec/filings" / ticker / report["accession"] / (
                 datetime.fromisoformat(metadata["retrieved_at_utc"]).strftime("%Y%m%dT%H%M%SZ")
                 + "_" + metadata["sha256"][:12] + ".html")
-        sections = prepare_sections("MSFT", form="10-Q", accession=report["accession"],
+        sections = prepare_sections(ticker, form="10-Q", accession=report["accession"],
                                     snapshot_path=snapshot_path)
         evidence = build_report_evidence(sections, metadata, profile=profile)
-        save_sections("MSFT", sections)
-        process_ticker("MSFT")
+        save_sections(ticker, sections)
+        process_ticker(ticker)
         write_json(run_dir / "source.json", {**metadata, "snapshot_path": str(Path(snapshot_path).resolve())})
         write_json(run_dir / "evidence.json", evidence)
         write_json(run_dir / "sections.json", sections)

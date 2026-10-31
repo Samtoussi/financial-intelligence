@@ -1,4 +1,4 @@
-"""Two observed Microsoft filings. Configuration only: no oracle values."""
+"""Pinned Microsoft and Caterpillar filings. Configuration only: no oracle values."""
 from copy import deepcopy
 
 REPORT = {
@@ -57,7 +57,7 @@ PROFILES[second["id"]] = second
 
 
 def get_profile(profile=DEFAULT_PROFILE):
-    # Resolve only the two named configurations, never arbitrary caller data.
+    # Resolve only named configurations, never arbitrary caller data.
     return deepcopy(PROFILES[profile])
 
 
@@ -70,4 +70,58 @@ def profile_for_accession(accession):
 
 def table_context(profile):
     report = profile["report"]
-    return ("Three Months Ended September 30", report["period_end"][:4], report["prior_end"][:4], "millions")
+    return (profile.get('table_period', "Three Months Ended September 30"), report["period_end"][:4], report["prior_end"][:4], "millions")
+
+
+def segment_ids(config):
+    if config.get('bindings'):
+        return [mid for mid, binding in config['bindings'].items() if binding['role'] == 'segment']
+    return [mid for mid in config['metrics'] if mid.endswith('_revenue')]
+
+
+# M005: configuration contains source selectors, never expected financial values.
+cat = {
+    'id': 'cat_2026_q1', 'ground_truth': 'cat_2026_q1.json', 'contract': 'm005-v1',
+    'company': 'Caterpillar Inc.', 'display_company': 'Caterpillar',
+    'table_period': 'Three Months Ended March 31', 'prior_fiscal_period': 'FY2025 Q1',
+    'report': {'ticker': 'CAT', 'cik': 18230, 'form': '10-Q',
+        'accession': '0000018230-26-000021', 'fiscal_period': 'FY2026 Q1',
+        'period_start': '2026-01-01', 'period_end': '2026-03-31',
+        'prior_start': '2025-01-01', 'prior_end': '2025-03-31',
+        'filing_date': '2026-05-06', 'document': 'cat-20260331.htm',
+        'source_url': 'https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm'},
+    'metrics': {
+        'revenue': ('Total sales and revenues', 'USD millions', 'GAAP'),
+        'operating_income': ('Operating profit', 'USD millions', 'GAAP'),
+        'net_income': ('Profit 1', 'USD millions', 'GAAP attributable to common shareholders'),
+        'diluted_eps': ('Profit per common share \u2013 diluted 2', 'USD per share', 'GAAP'),
+        'power_and_energy_revenue': ('Power & Energy', 'USD millions', 'Segment total including intersegment'),
+        'construction_industries_revenue': ('Construction Industries', 'USD millions', 'Segment total including intersegment'),
+        'resource_industries_revenue': ('Resource Industries', 'USD millions', 'Segment total including intersegment'),
+        'financial_products_revenue': ('Financial Products Segment', 'USD millions', 'Segment total including intersegment'),
+    },
+    'boundaries': [
+        ('income_statement', 'I.1', r'Consolidated Statement of Results of Operations', r'Consolidated Statement of Comprehensive Income', False),
+        ('segment_table', 'I.1', r'\| Sales and Revenues by Geographic Region', r'For the three months ended March 31, 2026 and 2025, Power & Energy external sales', False),
+        ('segment_basis', 'I.1', r'16\. Segment information', r'B\. Description of segments', False),
+        ('management_summary', 'I.2', r'Highlights for the first quarter of 2026 include:', r'Trends and Economic Conditions', False),
+    ],
+    'topics': {
+        'gaap_vs_non_gaap': 'Distinguish GAAP diluted EPS from adjusted EPS and explain only the disclosed restructuring adjustment for both periods.',
+        'segment_comparability': 'Explain the retrospective adjustment of 2025 segment figures and the January 2026 rail-business transfer; do not compare unrecast values.',
+        'sales_volume_and_price': 'Explain the disclosed sales-volume and price-realization contributions to consolidated revenue growth; avoid extrapolation or unsupported causes.',
+    },
+    'topic_windows': {'gaap_vs_non_gaap': ['management_summary'],
+        'segment_comparability': ['segment_basis'], 'sales_volume_and_price': ['management_summary']},
+    'presentation': {'takeaway': 'sales_volume_and_price',
+        'labels': {'revenue': 'Sales and revenues', 'operating_income': 'Operating profit',
+                   'net_income': 'Profit attributable to common shareholders', 'diluted_eps': 'Diluted EPS'}},
+}
+cat['bindings'] = {mid: {'window': 'income_statement', 'role': 'headline', 'layout': 'paired_row'}
+                   for mid in list(cat['metrics'])[:4]}
+cat['bindings'].update({mid: {'window': 'segment_table', 'role': 'segment', 'layout': 'period_blocks', 'column': 'total'}
+                        for mid in list(cat['metrics'])[4:]})
+cat['reconciliation_rows'] = [v[0] for v in list(cat['metrics'].values())[4:]] + [
+    'Total sales and revenues from reportable segments', 'All Other Segment',
+    'Corporate Items and Eliminations', 'Total Sales and Revenues']
+PROFILES[cat['id']] = cat

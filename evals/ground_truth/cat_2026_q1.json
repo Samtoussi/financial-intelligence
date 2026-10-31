@@ -1,0 +1,505 @@
+{
+  "schema_version": 1,
+  "milestone": "M005",
+  "report": {
+    "company": "Caterpillar Inc.",
+    "cik": "0000018230",
+    "form": "10-Q",
+    "fiscal_period": "FY2026 Q1",
+    "period_end": "2026-03-31",
+    "filing_date": "2026-05-06",
+    "accession": "0000018230-26-000021",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+    "filing_date_source": {
+      "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/0000018230-26-000021-index.html",
+      "section": "SEC filing detail",
+      "location": "Filing Date 2026-05-06; Period of Report 2026-03-31"
+    }
+  },
+  "periods": {
+    "current": {
+      "fiscal_period": "FY2026 Q1",
+      "start": "2026-01-01",
+      "end": "2026-03-31"
+    },
+    "prior": {
+      "fiscal_period": "FY2025 Q1",
+      "start": "2025-01-01",
+      "end": "2025-03-31"
+    }
+  },
+  "metrics": [
+    {
+      "id": "revenue",
+      "unit": "USD millions",
+      "gaap_status": "GAAP",
+      "current": {
+        "value": "17415",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2026-01-01",
+          "end": "2026-03-31"
+        }
+      },
+      "prior": {
+        "value": "14249",
+        "period": {
+          "fiscal_period": "FY2025 Q1",
+          "start": "2025-01-01",
+          "end": "2025-03-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Consolidated Statement of Results of Operations",
+        "page": 3,
+        "table": "Consolidated Statement of Results of Operations",
+        "row": "Total sales and revenues",
+        "columns": "Three Months Ended March 31: 2026 / 2025"
+      }
+    },
+    {
+      "id": "operating_income",
+      "unit": "USD millions",
+      "gaap_status": "GAAP",
+      "current": {
+        "value": "3085",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2026-01-01",
+          "end": "2026-03-31"
+        }
+      },
+      "prior": {
+        "value": "2579",
+        "period": {
+          "fiscal_period": "FY2025 Q1",
+          "start": "2025-01-01",
+          "end": "2025-03-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Consolidated Statement of Results of Operations",
+        "page": 3,
+        "table": "Consolidated Statement of Results of Operations",
+        "row": "Operating profit",
+        "columns": "Three Months Ended March 31: 2026 / 2025"
+      }
+    },
+    {
+      "id": "net_income",
+      "unit": "USD millions",
+      "gaap_status": "GAAP attributable to common shareholders",
+      "current": {
+        "value": "2549",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2026-01-01",
+          "end": "2026-03-31"
+        }
+      },
+      "prior": {
+        "value": "2003",
+        "period": {
+          "fiscal_period": "FY2025 Q1",
+          "start": "2025-01-01",
+          "end": "2025-03-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Consolidated Statement of Results of Operations",
+        "page": 3,
+        "table": "Consolidated Statement of Results of Operations",
+        "row": "Profit 1",
+        "columns": "Three Months Ended March 31: 2026 / 2025"
+      }
+    },
+    {
+      "id": "diluted_eps",
+      "unit": "USD per share",
+      "gaap_status": "GAAP",
+      "current": {
+        "value": "5.47",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2026-01-01",
+          "end": "2026-03-31"
+        }
+      },
+      "prior": {
+        "value": "4.20",
+        "period": {
+          "fiscal_period": "FY2025 Q1",
+          "start": "2025-01-01",
+          "end": "2025-03-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Consolidated Statement of Results of Operations",
+        "page": 3,
+        "table": "Consolidated Statement of Results of Operations",
+        "row": "Profit per common share – diluted 2",
+        "columns": "Three Months Ended March 31: 2026 / 2025"
+      }
+    },
+    {
+      "id": "power_and_energy_revenue",
+      "unit": "USD millions",
+      "gaap_status": "Segment total including intersegment",
+      "current": {
+        "value": "7031",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2026-01-01",
+          "end": "2026-03-31"
+        }
+      },
+      "prior": {
+        "value": "5783",
+        "period": {
+          "fiscal_period": "FY2025 Q1",
+          "start": "2025-01-01",
+          "end": "2025-03-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Power & Energy",
+        "columns": "Three Months Ended March 31: 2026 / 2025; Total Sales and Revenues (including intersegment)"
+      }
+    },
+    {
+      "id": "construction_industries_revenue",
+      "unit": "USD millions",
+      "gaap_status": "Segment total including intersegment",
+      "current": {
+        "value": "7161",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2026-01-01",
+          "end": "2026-03-31"
+        }
+      },
+      "prior": {
+        "value": "5184",
+        "period": {
+          "fiscal_period": "FY2025 Q1",
+          "start": "2025-01-01",
+          "end": "2025-03-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Construction Industries",
+        "columns": "Three Months Ended March 31: 2026 / 2025; Total Sales and Revenues (including intersegment)"
+      }
+    },
+    {
+      "id": "resource_industries_revenue",
+      "unit": "USD millions",
+      "gaap_status": "Segment total including intersegment",
+      "current": {
+        "value": "3797",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2026-01-01",
+          "end": "2026-03-31"
+        }
+      },
+      "prior": {
+        "value": "3661",
+        "period": {
+          "fiscal_period": "FY2025 Q1",
+          "start": "2025-01-01",
+          "end": "2025-03-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Resource Industries",
+        "columns": "Three Months Ended March 31: 2026 / 2025; Total Sales and Revenues (including intersegment)"
+      }
+    },
+    {
+      "id": "financial_products_revenue",
+      "unit": "USD millions",
+      "gaap_status": "Segment total including intersegment",
+      "current": {
+        "value": "1096",
+        "period": {
+          "fiscal_period": "FY2026 Q1",
+          "start": "2026-01-01",
+          "end": "2026-03-31"
+        }
+      },
+      "prior": {
+        "value": "1007",
+        "period": {
+          "fiscal_period": "FY2025 Q1",
+          "start": "2025-01-01",
+          "end": "2025-03-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Financial Products Segment",
+        "columns": "Three Months Ended March 31: 2026 / 2025; Total Sales and Revenues (including intersegment)"
+      }
+    }
+  ],
+  "reconciliation": [
+    {
+      "label": "Power & Energy",
+      "external": [
+        "5713",
+        "4654"
+      ],
+      "intersegment": [
+        "1318",
+        "1129"
+      ],
+      "total": [
+        "7031",
+        "5783"
+      ],
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Power & Energy",
+        "columns": "Three Months Ended March 31, 2026 / 2025; External / Intersegment / Total Sales and Revenues"
+      }
+    },
+    {
+      "label": "Construction Industries",
+      "external": [
+        "7102",
+        "5144"
+      ],
+      "intersegment": [
+        "59",
+        "40"
+      ],
+      "total": [
+        "7161",
+        "5184"
+      ],
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Construction Industries",
+        "columns": "Three Months Ended March 31, 2026 / 2025; External / Intersegment / Total Sales and Revenues"
+      }
+    },
+    {
+      "label": "Resource Industries",
+      "external": [
+        "3710",
+        "3586"
+      ],
+      "intersegment": [
+        "87",
+        "75"
+      ],
+      "total": [
+        "3797",
+        "3661"
+      ],
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Resource Industries",
+        "columns": "Three Months Ended March 31, 2026 / 2025; External / Intersegment / Total Sales and Revenues"
+      }
+    },
+    {
+      "label": "Financial Products Segment",
+      "external": [
+        "1096",
+        "1007"
+      ],
+      "intersegment": [
+        "0",
+        "0"
+      ],
+      "total": [
+        "1096",
+        "1007"
+      ],
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Financial Products Segment",
+        "columns": "Three Months Ended March 31, 2026 / 2025; External / Intersegment / Total Sales and Revenues"
+      }
+    },
+    {
+      "label": "Total sales and revenues from reportable segments",
+      "external": [
+        "17621",
+        "14391"
+      ],
+      "intersegment": [
+        "1464",
+        "1244"
+      ],
+      "total": [
+        "19085",
+        "15635"
+      ],
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Total sales and revenues from reportable segments",
+        "columns": "Three Months Ended March 31, 2026 / 2025; External / Intersegment / Total Sales and Revenues"
+      }
+    },
+    {
+      "label": "All Other Segment",
+      "external": [
+        "12",
+        "11"
+      ],
+      "intersegment": [
+        "65",
+        "59"
+      ],
+      "total": [
+        "77",
+        "70"
+      ],
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "All Other Segment",
+        "columns": "Three Months Ended March 31, 2026 / 2025; External / Intersegment / Total Sales and Revenues"
+      }
+    },
+    {
+      "label": "Corporate Items and Eliminations",
+      "external": [
+        "-218",
+        "-153"
+      ],
+      "intersegment": [
+        "-1529",
+        "-1303"
+      ],
+      "total": [
+        "-1747",
+        "-1456"
+      ],
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Corporate Items and Eliminations",
+        "columns": "Three Months Ended March 31, 2026 / 2025; External / Intersegment / Total Sales and Revenues"
+      }
+    },
+    {
+      "label": "Total Sales and Revenues",
+      "external": [
+        "17415",
+        "14249"
+      ],
+      "intersegment": [
+        "0",
+        "0"
+      ],
+      "total": [
+        "17415",
+        "14249"
+      ],
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+        "section": "Part I, Item 1 / Note 16",
+        "page": 27,
+        "table": "Sales and Revenues by Geographic Region",
+        "row": "Total Sales and Revenues",
+        "columns": "Three Months Ended March 31, 2026 / 2025; External / Intersegment / Total Sales and Revenues"
+      }
+    }
+  ],
+  "qualitative_review_cases": [
+    {
+      "id": "gaap_vs_non_gaap",
+      "question": "Distinguish GAAP diluted EPS from adjusted EPS and explain only the disclosed restructuring adjustment for both periods.",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+          "section": "Part I, Item 2",
+          "page": 43,
+          "location": "Highlights, restructuring adjustment table and Overview"
+        }
+      ]
+    },
+    {
+      "id": "segment_comparability",
+      "question": "Explain the retrospective adjustment of 2025 segment figures and the January 2026 rail-business transfer; do not compare unrecast values.",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+          "section": "Part I, Item 1 / Note 16",
+          "page": 24,
+          "location": "Segment reporting changes and retrospective adjustment"
+        }
+      ]
+    },
+    {
+      "id": "sales_volume_and_price",
+      "question": "Explain the disclosed sales-volume and price-realization contributions to consolidated revenue growth; avoid extrapolation or unsupported causes.",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm",
+          "section": "Part I, Item 2",
+          "page": 43,
+          "location": "Highlights, restructuring adjustment table and Overview"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "method": "Transcribed from original SEC HTML tables, independently of production extraction and model output. Numerical identities and cached CompanyFacts cross-checks are separate checks. Human oracle review remains pending.",
+    "source_sha256": "b9b2e4ba36aa354fc65b42ddd15a13d928f015bc8262c58438bf3575832e37a6",
+    "human_review_status": "pending_manual_review",
+    "limitations": [
+      "Segment revenue includes intersegment activity; reported 2025 figures are retrospectively adjusted.",
+      "Financial Products external revenue includes affiliate revenues per footnote 1.",
+      "No adjusted earnings are substituted for GAAP headlines."
+    ]
+  }
+}

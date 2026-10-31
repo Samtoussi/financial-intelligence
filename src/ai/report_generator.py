@@ -129,5 +129,10 @@ def render_report(report: dict, evidence: list[dict]) -> str:
     lines.append("")
     for note in report.get("notes", []):
         lines.extend([f"- {note.get('text')} {references(note.get('citations', []))}", ""])
+    if report.get('reconciliation'):
+        lines += ['## Revenue reconciliation', 'Exact USD millions; current / prior.',
+                  '| Component | External | Intersegment | Total | Evidence |', '|---|---:|---:|---:|---|']
+        for row in report['reconciliation']:
+            lines.append('| ' + row['label'] + ' | ' + ' | '.join(' / '.join(row[k]) for k in ('external', 'intersegment', 'total')) + ' | ' + references(row['citations']) + ' |')
     lines.append("Automated draft. Citation integrity and manual semantic review are reported separately in evaluation.json.")
     return "\n\n".join(lines[:2]) + "\n\n" + "\n".join(lines[2:]) + "\n"
