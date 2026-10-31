@@ -58,6 +58,10 @@ def reevaluate(run_dir: Path, *, reviews=None, profile=None):
 def run_baseline(*, snapshot_path=None, download=False, client=None, model=MODEL,
                  reports_dir=None, profile=DEFAULT_PROFILE, generation_mode="legacy"):
     """Generate once. Save failures without credentials or exception/request dumps."""
+    if profile == 'jpm_2026_q2':
+        if download or generation_mode != report_assembly.MODE:
+            raise ValueError('JPM uses pinned offline source and deterministic assembly only')
+        return run_banking(snapshot_path=snapshot_path, client=client, model=model, reports_dir=reports_dir)
     if generation_mode not in ("legacy", report_assembly.MODE):
         raise ValueError("Unsupported generation mode")
     assembly_mode = generation_mode == report_assembly.MODE
@@ -141,6 +145,143 @@ def run_baseline(*, snapshot_path=None, download=False, client=None, model=MODEL
         raise RuntimeError(f"Quarterly report incomplete ({type(exc).__name__}); artifacts: {run_dir}") from None
 
 
+def run_banking(*, snapshot_path=None, client=None, model=MODEL, reports_dir=None):
+    """One bounded M006 attempt using the shared generate() and raw-response saver.
+
+    Live calls additionally require the completed offline gate and an exclusive
+    attempt ledger. There is no retry or SEC acquisition path.
+    """
+    import hashlib
+    from src.analytics.jpm_extraction import extract_jpm
+    from src.evaluation.ground_truth import load_dataset
+    from src.evaluation.jpm_ground_truth import verify_sources
+    from src.evaluation.report_evaluation import evaluate_financials, evaluate_banking_response, evaluate_banking_report
+    from src.analytics.investor_report import build_banking_presentation, render_banking_main, render_banking_details, digest
+    from src.evaluation.investor_report import evaluate_banking_presentation
+    os.chdir(ROOT); load_dotenv(ROOT/'.env')
+    if client is None:
+        gate = load_dataset(ROOT/'data/m006-step4/offline_checks.json')
+        if not gate.get('tests_passed') or gate.get('regressions_passed') != 5 or not gate.get('historical_integrity_pass'):
+            raise ValueError('Completed offline verification is required')
+        if any(hashlib.sha256((ROOT/p).read_bytes()).hexdigest() != sha for p, sha in gate['code_sha256'].items()):
+            raise ValueError('Code changed after offline verification')
+        if (ROOT/'data/m006-step4/live_attempt.json').exists():
+            raise ValueError('The single authorized JPM live attempt is already consumed')
+    output = Path(reports_dir or ROOT/'evals/reports/m006/ai') / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+uuid4().hex[:8])
+    output.mkdir(parents=True, exist_ok=False)
+    def save(name, data):
+        with (output/name).open('x', encoding='utf-8', newline='\n') as stream:
+            stream.write(json.dumps(data, indent=2, ensure_ascii=False)+'\n')
+        if name == 'raw_llm_text.json':
+            with (output/'raw_output.txt').open('xb') as stream: stream.write(data.encode('utf-8'))
+    initial = {'profile': 'jpm_2026_q2', 'generation_mode': report_assembly.MODE, 'model': model,
+        'prompt_version': 'm006-assembly-v1', 'live_model_call_attempted': False, 'status': 'preflight_started'}
+    save('run.initial.json', initial)
+    attempted = False
+    try:
+        payload, metadata = load_latest_snapshot('JPM', form='10-Q', accession='0001628280-26-054343', snapshot_path=snapshot_path)
+        extraction = extract_jpm(payload, metadata)
+        gt = load_dataset(ROOT/'evals/ground_truth/jpm_2026_q2.json'); s = gt['source_snapshot']
+        original = verify_sources(gt, payload, metadata, (ROOT/s['filing_detail_path']).read_bytes(),
+                                  load_dataset(ROOT/s['filing_detail_metadata_path']))
+        evidence = extraction['evidence']; prepared = report_assembly.prepare(evidence, 'jpm_2026_q2')
+        financial = evaluate_financials(prepared['financial_foundation'], extraction, gt, payload=payload, metadata=metadata)
+        if not original['source_verified'] or not financial['automatic_pass']: raise ValueError('Financial/source preflight failed')
+        allowed = report_assembly.allowed_span_ids(prepared, 'jpm_2026_q2')
+        schema = report_assembly.schema_for('jpm_2026_q2', allowed)
+        # Strict schema is checked offline and retained before any model call.
+        save('preflight.json', {'source': original, 'financial': financial, 'eligible_topic_counts': {k:len(v) for k,v in allowed.items()}, 'schema_strict': schema['strict']})
+        save('source.json', metadata); save('extraction.json', extraction); save('evidence.json', evidence)
+        save('profile.json', get_profile('jpm_2026_q2'))
+        with (output/'instructions.txt').open('x', encoding='utf-8') as f: f.write(report_assembly.instructions_for('jpm_2026_q2'))
+        if client is None and not os.environ.get('OPENAI_API_KEY', '').strip():
+            save('run.json', {**initial, 'status':'credentials_unavailable'}); return output, None
+        if client is None:
+            with (ROOT/'data/m006-step4/live_attempt.json').open('x', encoding='utf-8') as f:
+                json.dump({'run_directory': str(output), 'attempt_count': 1, 'model': model}, f)
+        attempted = client is None
+        save('attempt.json', {'live_model_call_attempted': attempted, 'generation_attempt_count': 1})
+        def validate(raw):
+            result = evaluate_banking_response(raw, evidence, extraction, gt, payload=payload, metadata=metadata)
+            save('response_evaluation.json', result)
+            return result
+        report, generation = report_assembly.generate(evidence, 'jpm_2026_q2', client=client, model=model, save=save, validate_raw=validate)
+        raw = load_dataset(output/'raw_llm.json')
+        evaluation = evaluate_banking_report(report, raw, evidence, extraction, gt, payload=payload, metadata=metadata)
+        save('evaluation.json', evaluation)
+        if not evaluation['automatic_pass']: raise ValueError('Assembled report evaluation failed')
+        view = build_banking_presentation(report, raw, extraction, payload, metadata)
+        main = render_banking_main(report, view); detail = render_banking_details(report, view)
+        presentation = evaluate_banking_presentation(report, raw, extraction, view, main, detail,
+            payload=payload, metadata=metadata, evaluation=evaluation)
+        save('presentation_evaluation.json', presentation)
+        if not presentation['automatic_pass']: raise ValueError('Presentation evaluation failed')
+        save('generated.json', report); save('generation.json', generation); save('presentation.json', view)
+        for name, text in (('report.md', main), ('supporting_detail.md', detail)):
+            with (output/name).open('xb') as f: f.write(text.encode('utf-8'))
+        save('review_template.json', {'status':'pending_manual_review', 'reviewer':'', 'rationale':'',
+            'report_sha256':digest(main.encode()), 'supporting_detail_sha256':digest(detail.encode()),
+            'criteria':['30-second comprehension and clarity', 'faithful emphasis and comparisons', 'narrative context and citations', 'formatting and completeness']})
+        save('semantic_review_template.json', {n:{'status':'pending_manual_review','reviewer':'','rationale':'',
+            'evidence_ids':[c['evidence_id'] for c in next(note for note in report['notes'] if note['id']==n)['citations']]}
+            for n in get_profile('jpm_2026_q2')['topics']})
+        save('run.json', {**initial, 'live_model_call_attempted':attempted, 'status':'completed_pending_review', 'overall_pass':False, **generation})
+        return output, evaluation
+    except Exception as exc:
+        save('run.json', {**initial, 'live_model_call_attempted':attempted, 'status':'failed_preserved',
+            'error_type':type(exc).__name__, 'overall_pass':False})
+        return output, None
+
+
+def cli_summary(run_dir, result, profile=None):
+    """Project explicit evaluator contracts into the existing CLI display schema.
+
+    JPM separates financial and narrative diagnostics; MSFT/CAT expose financial
+    counters at the top level. This does not adapt or change evaluation gates.
+    """
+    def require(condition, field):
+        if not condition: raise ValueError('Missing or invalid ' + field)
+
+    require(isinstance(result, dict), 'evaluation object')
+    version = result.get('evaluation_version')
+    require(version in ('m003-eval-v1', 'm005-eval-v3', 'm006-ai-eval-v1'), 'evaluation_version')
+    banking = version == 'm006-ai-eval-v1'
+    if profile is not None:
+        expected = ('m006-ai-eval-v1' if profile == 'jpm_2026_q2' else
+                    'm005-eval-v3' if profile == 'cat_2026_q1' else 'm003-eval-v1')
+        require(version == expected, 'profile/evaluation_version agreement')
+    for field in ('automatic_pass', 'overall_pass'):
+        require(type(result.get(field)) is bool, field)
+    require(not result['overall_pass'] or result['automatic_pass'], 'overall_pass gate consistency')
+    financial = result
+    if banking:
+        financial = result.get('financial')
+        require(isinstance(financial, dict), 'financial object')
+        require(financial.get('evaluation_version') == 'm006-financial-eval-v1', 'financial.evaluation_version')
+        require(type(financial.get('automatic_pass')) is bool, 'financial.automatic_pass')
+        narrative = result.get('narrative')
+        require(isinstance(narrative, dict) and type(narrative.get('automatic_pass')) is bool, 'narrative.automatic_pass')
+        for field in ('source_context_pass', 'assembled_response_match'):
+            require(type(result.get(field)) is bool, field)
+        require(result['automatic_pass'] == (financial['automatic_pass'] and narrative['automatic_pass']
+            and result['source_context_pass'] and result['assembled_response_match']), 'banking gate consistency')
+    summary = {'run_dir': str(run_dir)}
+    for field in ('financial_values', 'yoy_changes', 'table_evidence_support'):
+        counter = financial.get(field)
+        require(isinstance(counter, dict) and set(counter) == {'passed', 'total'}
+            and type(counter['passed']) is int and type(counter['total']) is int
+            and 0 <= counter['passed'] <= counter['total'], field)
+        summary[field] = counter
+    reviews = result.get('manual_reviews')
+    require(isinstance(reviews, list) and bool(reviews), 'manual_reviews')
+    require(all(isinstance(r, dict) and isinstance(r.get('id'), str) and r['id']
+        and isinstance(r.get('status'), str) and r['status'] for r in reviews), 'manual review entries')
+    require(len({r['id'] for r in reviews}) == len(reviews), 'unique manual review IDs')
+    summary.update(automatic_pass=result['automatic_pass'], overall_pass=result['overall_pass'],
+        manual_reviews={r['id']:r['status'] for r in reviews})
+    return summary
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=tuple(PROFILES), default=None, help="Filing profile; defaults to approved M002, inferred from saved source for re-evaluation")
@@ -165,10 +306,12 @@ def main(argv=None):
     except (RuntimeError, ValueError, OSError) as exc:
         print(f"Quarterly report could not complete ({type(exc).__name__}). Check the latest run.json and local configuration.", file=sys.stderr)
         return 1
-    print(json.dumps({"run_dir": str(run_dir), "financial_values": result["financial_values"],
-                      "yoy_changes": result["yoy_changes"], "table_evidence_support": result["table_evidence_support"],
-                      "automatic_pass": result["automatic_pass"], "overall_pass": result["overall_pass"],
-                      "manual_reviews": {r["id"]: r["status"] for r in result["manual_reviews"]}}, indent=2))
+    try:
+        summary = cli_summary(run_dir, result, args.profile)
+    except ValueError as exc:
+        print('Invalid evaluation result contract: ' + str(exc), file=sys.stderr)
+        return 1
+    print(json.dumps(summary, indent=2))
     return 0 if result["overall_pass"] else (2 if result["automatic_pass"] else 1)
 
 

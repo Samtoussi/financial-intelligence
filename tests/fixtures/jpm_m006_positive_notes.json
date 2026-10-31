@@ -1,0 +1,8 @@
+{
+  "description": "Synthetic offline fixture; not a live response or human approval.",
+  "texts": {
+    "reported_vs_managed": "Headline revenue uses GAAP reported results. Managed revenue includes FTE adjustments, which do not change net income.",
+    "credit_loss_measures": "Provision expense, net charge-offs and allowance balances are different measures. Lower provisions alone do not establish improving credit quality; these figures do not provide a complete allowance rollforward.",
+    "significant_earnings_items": "The disclosed Visa-related net gain was $4.6 billion. Other equity investment gains were $1.0 billion. These gains should be distinguished from recurring business performance; no adjusted EPS is calculated."
+  }
+}

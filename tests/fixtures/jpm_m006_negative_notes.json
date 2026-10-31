@@ -1,0 +1,145 @@
+{
+  "description": "Synthetic negative fixtures and positive counterparts; no human approvals.",
+  "cases": [
+    {
+      "id": "fabricated_number",
+      "topic": "reported_vs_managed",
+      "negative": "GAAP reported net revenue was $57.348 billion.",
+      "positive": "GAAP reported net revenue was $57.347 billion.",
+      "rule": "monetary_scale_or_value"
+    },
+    {
+      "id": "managed_substitution",
+      "topic": "reported_vs_managed",
+      "negative": "GAAP reported net revenue was $58.022 billion.",
+      "positive": "Managed revenue was $58.022 billion.",
+      "rule": "number_measure_or_dimension_binding"
+    },
+    {
+      "id": "fte_net_income",
+      "topic": "reported_vs_managed",
+      "negative": "FTE adjustments increase net income.",
+      "positive": "FTE adjustments do not change net income.",
+      "rule": "fte_net_income"
+    },
+    {
+      "id": "provision_chargeoffs",
+      "topic": "credit_loss_measures",
+      "negative": "Net charge-offs were $2.515 billion.",
+      "positive": "Net charge-offs were $2.366 billion.",
+      "rule": "number_measure_or_dimension_binding"
+    },
+    {
+      "id": "credit_quality",
+      "topic": "credit_loss_measures",
+      "negative": "Lower provisions prove improving credit quality.",
+      "positive": "Lower provisions alone do not establish improving credit quality.",
+      "rule": "unsupported_credit_quality"
+    },
+    {
+      "id": "recurring_gain",
+      "topic": "significant_earnings_items",
+      "negative": "The Visa gain is recurring operating earnings.",
+      "positive": "The Visa gain is distinct from recurring business performance.",
+      "rule": "recurring_gain"
+    },
+    {
+      "id": "adjusted_eps",
+      "topic": "significant_earnings_items",
+      "negative": "Adjusted EPS was $6.00 excluding the gains.",
+      "positive": "No adjusted EPS is calculated from these gains.",
+      "rule": "invented_adjusted_earnings"
+    },
+    {
+      "id": "counterfactual",
+      "topic": "significant_earnings_items",
+      "negative": "Earnings without the gains would have increased.",
+      "positive": "Do not infer what earnings would have been without the gains.",
+      "rule": "invented_adjusted_earnings"
+    },
+    {
+      "id": "quarter_ytd",
+      "topic": "reported_vs_managed",
+      "negative": "Six-month revenue was $57.347 billion.",
+      "positive": "GAAP reported net revenue was $57.347 billion in Q2 2026.",
+      "rule": "quarter_ytd"
+    },
+    {
+      "id": "balance_yoy",
+      "topic": "credit_loss_measures",
+      "negative": "Total loans increased 3.3% YoY.",
+      "positive": "Total loans increased 3.3% since year-end.",
+      "rule": "balance_comparison"
+    },
+    {
+      "id": "balance_date",
+      "topic": "credit_loss_measures",
+      "negative": "Total loans increased 3.3% since June 30, 2025.",
+      "positive": "Total loans increased 3.3% since December 31, 2025.",
+      "rule": "balance_comparison"
+    },
+    {
+      "id": "loan_scope",
+      "topic": "credit_loss_measures",
+      "negative": "Total loans represent net loans.",
+      "positive": "Total loans are before the separate loan allowance.",
+      "rule": "balance_scope"
+    },
+    {
+      "id": "deposit_scope",
+      "topic": "credit_loss_measures",
+      "negative": "Deposit liabilities are deposits with banks.",
+      "positive": "Deposit liabilities are distinct from deposits with banks.",
+      "rule": "balance_scope"
+    },
+    {
+      "id": "causal",
+      "topic": "credit_loss_measures",
+      "negative": "Net charge-offs fell because all customers repaid their loans.",
+      "positive": "Wholesale provision was driven by a net increase in the loan portfolio.",
+      "rule": "unsupported_causal_claim"
+    },
+    {
+      "id": "rollforward",
+      "topic": "credit_loss_measures",
+      "negative": "These figures provide a complete allowance rollforward.",
+      "positive": "These figures do not provide a complete allowance rollforward.",
+      "rule": "invented_rollforward"
+    },
+    {
+      "id": "units",
+      "topic": "significant_earnings_items",
+      "negative": "The Visa-related net gain was $4.6.",
+      "positive": "The Visa-related net gain was $4.6 billion.",
+      "rule": "monetary_scale_or_value"
+    },
+    {
+      "id": "bare_number",
+      "topic": "significant_earnings_items",
+      "negative": "The Visa-related net gain was 4.6.",
+      "positive": "The Visa-related net gain was 4.6 billion dollars.",
+      "rule": "unqualified_or_unsupported_number"
+    },
+    {
+      "id": "eps_units",
+      "topic": "significant_earnings_items",
+      "negative": "Diluted EPS was $7.70 million.",
+      "positive": "Diluted EPS was $7.70 per share.",
+      "rule": "monetary_scale_or_value"
+    },
+    {
+      "id": "percentage",
+      "topic": "reported_vs_managed",
+      "negative": "GAAP reported revenue increased 55%.",
+      "positive": "GAAP reported revenue increased 27.7%.",
+      "rule": "number_measure_or_dimension_binding"
+    },
+    {
+      "id": "bps",
+      "topic": "credit_loss_measures",
+      "negative": "Total loans increased 3.3 basis points.",
+      "positive": "Total loans increased 3.3%.",
+      "rule": "number_measure_or_dimension_binding"
+    }
+  ]
+}

@@ -353,3 +353,263 @@ def write_presentation(input_dir, output_root, *, allow_pending_review=False):
     (output / 'report.md').write_bytes(report.encode('utf-8'))
     (output / 'supporting_detail.md').write_bytes(detail.encode('utf-8'))
     return output, evaluation
+
+
+def build_financial_presentation(report, extraction, payload, metadata):
+    """M006 financial-only view using existing formatting and references.
+
+    This does not enter the approved AI-report gate or assert semantic approval.
+    """
+    from src.ai.report_assembly import assemble_financials
+    if report != assemble_financials(extraction, payload, metadata):
+        raise GateError('Financial foundation differs from source-bound assembly')
+    source_labels = {'income_statement': 'Income statement, page 93',
+        'balance_sheet': 'Balance sheet, page 95', 'reported_to_managed': 'Reported and managed basis, page 18',
+        'credit_highlights': 'Financial highlights, page 3', 'credit_context': 'Quarterly credit-loss context, page 12',
+        'allowance_scope': 'Allowance scopes and footnote (b), page 76', 'significant_items': 'Significant earnings items, page 5'}
+    sources, refs = {}, {}
+    for i, e in enumerate(extraction['evidence'], 1):
+        ref = 'S'+str(i); refs[e['evidence_id']] = ref
+        sources[ref] = {'label': source_labels[e['label']], 'url': e['source_url'],
+            'evidence_id': e['evidence_id'], 'source_sha256': e['source_sha256'], 'item': e['item']}
+    claims = {m['id']: copy.deepcopy(m) for m in report['metrics'] + report['reconciliation'] + report['source_context']}
+    claims['allowance_stock'] = copy.deepcopy(report['allowance_stock'])
+    for claim in claims.values():
+        for c in claim['citations']: c['reference'] = refs[c['evidence_id']]
+    metrics = [{**copy.deepcopy(m), 'display_current': money(m['current'], m['unit']),
+                'display_prior': money(m['prior'], m['unit']), 'display_change': percent(m['change_percent'])}
+               for m in report['metrics']]
+    return {'version': 'm006-financial-presentation-v1', 'report': copy.deepcopy(report['report']),
+        'metrics': metrics, 'reconciliation': copy.deepcopy(report['reconciliation']),
+        'allowance_stock': copy.deepcopy(report['allowance_stock']), 'claims': claims, 'sources': sources,
+        'review_status': 'pending_manual_review', 'generation_mode': 'deterministic_financial_foundation'}
+
+
+def _financial_period(period):
+    return period['as_of'] if 'as_of' in period else period['start']+' to '+period['end']
+
+
+def _financial_exact(value, unit='USD millions'):
+    return f'{number(value):,.2f}' if unit == 'USD per share' else f'{number(value):,.0f}'
+
+
+def render_financial_main(view):
+    """Deterministic banking tables and original source text; no AI narrative."""
+    meta = view['report']; by_id = {m['id']: m for m in view['metrics']}
+    rows = {r['id']: r for r in view['reconciliation']}
+    def refs(ids): return references(view, ids)
+    def equations(ids):
+        result = ['| Period | Accounting identity (USD millions) |', '|---|---|']
+        for rid in ids:
+            r = rows[rid]
+            equation = ''
+            for i, t in enumerate(r['operands']):
+                sign = (' + ' if t['coefficient'] == 1 else ' - ') if i else ''
+                equation += sign + t['label']+' '+_financial_exact(t['value'])
+            equation += ' = '+r['result_label']+' '+_financial_exact(r['result'])
+            result.append('| '+_financial_period(r['period'])+' | '+equation+' |')
+        return result + ['', refs(ids)]
+    def metric_table(kind):
+        stocks = kind == 'point_in_time'
+        heading = ('| Metric | June 30, 2026 | December 31, 2025 | Change since year-end | Unit |' if stocks else
+                   '| Metric | Q2 2026 | Q2 2025 | YoY change | Unit |')
+        result = [heading, '|---|---:|---:|---:|---|']
+        selected = [m for m in view['metrics'] if m['kind'] == kind]
+        for m in selected:
+            result.append('| '+m['label']+' | '+_financial_exact(m['current'], m['unit'])+' | '+
+                _financial_exact(m['prior'], m['unit'])+' | '+m['display_change']+' | '+m['unit']+' |')
+        return result + ['', refs([m['id'] for m in selected])]
+    rev, ni, eps = (by_id[mid] for mid in ('total_net_revenue', 'net_income', 'diluted_eps'))
+    lines = [f"# {meta['company']} (JPM) - {meta['fiscal_period']}", '',
+        '**Deterministic financial foundation. Human review pending; no AI interpretation.**', '',
+        '## Financial highlights', '',
+        f"Q2 2026 reported GAAP net revenue was {rev['display_current']}; net income was {ni['display_current']}; diluted EPS was {eps['display_current']} per share. "+refs(['total_net_revenue', 'net_income', 'diluted_eps']), '',
+        'Highlight B amounts are USD billions rounded to one decimal. Tables retain exact USD millions and USD per share.', '',
+        '## Quarterly YoY performance', '',
+        'GAAP reported. April 1-June 30, 2026 versus April 1-June 30, 2025. Changes use exact values and round to one decimal percentage.', '']
+    lines += metric_table('flow') + ['', '## Loans and deposits since year-end', '',
+        'Point-in-time consolidated balances. Loans are before the separately presented loan allowance; deposits are liabilities.', '']
+    lines += metric_table('point_in_time') + ['', 'Loans less the separately presented allowance reconcile to net loans:', '']
+    lines += equations(['net_loans:current', 'net_loans:prior'])
+    lines += ['', '## Reported versus managed accounting basis', '',
+        'Headline revenue is GAAP reported. Managed revenue includes fully taxable-equivalent (FTE) adjustments. These adjustments do not change net income. '+refs(['reported_to_managed']), '']
+    lines += equations(['reported_revenue:current', 'reported_revenue:prior'])
+    lines += ['', '| Metric | Quarter | GAAP reported | FTE adjustment | Managed basis |', '|---|---|---:|---:|---:|']
+    managed_ids = [r['id'] for r in view['reconciliation'] if r['id'].startswith('managed:')]
+    for rid in managed_ids:
+        r = rows[rid]
+        lines.append('| '+r['label']+' | '+_financial_period(r['period'])+' | '+
+            ' | '.join(_financial_exact(t['value']) for t in r['operands'])+' | '+_financial_exact(r['result'])+' |')
+    lines += ['', 'All basis-bridge amounts are USD millions.', '', refs(managed_ids), '', '## Credit-loss context', '',
+        'Provision is an expense; net charge-offs are losses charged off net of recoveries; allowances are point-in-time balances. A lower provision alone does not establish improving credit quality. '+refs(['credit_context']), '']
+    lines += equations(['credit_net_addition:current', 'credit_net_addition:prior'])
+    stock = view['allowance_stock']
+    lines += ['', '| Firmwide allowance stock (USD millions) | June 30, 2026 | December 31, 2025 |', '|---|---:|---:|',
+        '| Allowance for credit losses | '+_financial_exact(stock['current'])+' | '+_financial_exact(stock['prior'])+' |',
+        '', refs(['allowance_stock']), '', 'June 30, 2026 allowance scopes:', '']
+    lines += equations(['principal_allowance:current', 'firmwide_allowance:current'])
+    lines += ['', 'These checks do not constitute a complete beginning-to-ending allowance rollforward.', '',
+        '## Significant earnings items', '', 'Original filing disclosure:', '',
+        '> '+text(view['claims']['significant_items']['citations'][0]['quote']), '', refs(['significant_items']), '',
+        'The disclosed gains are included in reported results and are identified separately here when assessing recurring performance.', '',
+        '[Exact values, accounting scopes and source quotations](supporting_detail.md).', '',
+        '## Source references', '', f"Form {meta['form']}, accession {meta['accession']}, filed {meta['filing_date']}.", '']
+    lines += [f"- [{s['label']}][{ref}]" for ref, s in view['sources'].items()]
+    lines += ['']+[f"[{ref}]: {s['url']}" for ref, s in view['sources'].items()]
+    return '\n'.join(lines)+'\n'
+
+
+def render_financial_details(view):
+    lines = ['# Financial supporting detail', '', 'Deterministic foundation; human review pending.', '',
+        '| Metric | Current | Prior | Unit | Basis | Comparison | Change |', '|---|---:|---:|---|---|---|---:|']
+    for m in view['metrics']:
+        lines.append('| '+m['label']+' | '+m['current']+' | '+m['prior']+' | '+m['unit']+' | '+m['gaap_status']+' | '+m['comparison']+' | '+m['display_change']+' |')
+    for m in view['metrics']:
+        lines += ['', '## '+m['label'], '', 'Source label: '+m['source_label'], '',
+            'Scope: '+m['scope'], '', 'Current: '+_financial_period(m['periods']['current'])+
+            '; comparison: '+_financial_period(m['periods']['prior'])+'.', '', references(view, [m['id']])]
+    lines += ['', '## Exact source quotations', '', 'Offsets address saved section text, not raw HTML bytes.']
+    seen = set()
+    for claim in view['claims'].values():
+        for c in claim['citations']:
+            key = (c['evidence_id'], c['start_char'], c['end_char'])
+            if key in seen: continue
+            seen.add(key)
+            fence = '`'*max(3, max((len(x) for x in re.findall(r'`+', c['quote'])), default=0)+1)
+            s = view['sources'][c['reference']]
+            lines += ['', f"### {s['label']}", '', f"[{c['accession']}]({c['source_url']}); {c['item']}; section offsets {c['start_char']}:{c['end_char']}", '',
+                'Original source SHA-256: '+c['source_sha256'], '', fence, c['quote'], fence]
+    return '\n'.join(lines)+'\n'
+
+
+def write_financial_foundation(extraction, payload, metadata, ground_truth, output_root):
+    """Evaluate then write a new immutable financial-only draft directory."""
+    from src.ai.report_assembly import assemble_financials
+    from src.evaluation.report_evaluation import evaluate_financials
+    from src.evaluation.investor_report import evaluate_financial_presentation
+    report = assemble_financials(extraction, payload, metadata)
+    evaluation = evaluate_financials(report, extraction, ground_truth, payload=payload, metadata=metadata)
+    if not evaluation['automatic_pass']: raise GateError('Financial evaluation failed')
+    view = build_financial_presentation(report, extraction, payload, metadata)
+    main, detail = render_financial_main(view), render_financial_details(view)
+    checks = evaluate_financial_presentation(report, extraction, view, main, detail,
+        payload=payload, metadata=metadata, financial_evaluation=evaluation)
+    if not checks['automatic_pass']: raise GateError('Financial presentation failed')
+    output = Path(output_root).resolve() / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+uuid4().hex[:8])
+    output.mkdir(parents=True, exist_ok=False)
+    files = {'financials.json': report, 'financial_evaluation.json': evaluation, 'presentation.json': view,
+        'presentation_evaluation.json': checks,
+        'input_manifest.json': {'source_sha256': digest(payload),
+            'extraction_content_sha256': digest(json.dumps(extraction, sort_keys=True).encode()),
+            'oracle_content_sha256': digest(json.dumps(ground_truth, sort_keys=True).encode())},
+        'review_template.json': {'status': 'pending_manual_review', 'reviewer': '', 'rationale': '',
+            'report_sha256': digest(main.encode()), 'supporting_detail_sha256': digest(detail.encode()),
+            'criteria': ['30-second comprehension and clarity', 'faithful emphasis and comparisons',
+                         'narrative context and citations', 'formatting and completeness']}}
+    for name, data in files.items():
+        (output/name).write_text(json.dumps(data, indent=2, ensure_ascii=False)+'\n', encoding='utf-8')
+    (output/'report.md').write_bytes(main.encode())
+    (output/'supporting_detail.md').write_bytes(detail.encode())
+    return output, evaluation, checks
+
+
+def banking_note_text(note):
+    """Preserve validated JPM prose; intraword underscores are not emphasis.
+
+    Citation labels have already passed structured-span validation in assembly
+    and build_banking_presentation. This is only a Markdown formatting gate.
+    """
+    value = note['text']
+    if re.search(r'[\\`*\[\]<>|]|(?<!\w)_|_(?!\w)|\n', value):
+        raise GateError('Banking note requires formatting review before byte-exact reuse')
+    return value
+
+
+def presented_banking_note(note, report):
+    """Two bounded editorial changes; assembled notes remain original audit text."""
+    value = banking_note_text(note)
+    suffix = re.search(r'\s+Defining source: ([A-Za-z0-9_]+)\.$', value)
+    if suffix:
+        defining = {'reported_vs_managed':'reported_to_managed', 'credit_loss_measures':'credit_context',
+                    'significant_earnings_items':'significant_items'}[note['id']]
+        context = next(c for c in report['source_context'] if c['id'] == defining)
+        required = {(c['evidence_id'], c['quote']) for c in context['citations']}
+        selected = {(c['evidence_id'], c['quote']) for c in note['citations']}
+        if suffix[1] != defining or not required.intersection(selected):
+            raise GateError('Unvalidated defining-source suffix')
+        value = value[:suffix.start()]
+    if re.search(r'\bDefining source:', value):
+        raise GateError('Unsupported defining-source annotation')
+    if note['id'] == 'credit_loss_measures':
+        # Only replace the known quarterly rounded-disclosure construction.
+        # Each displayed input must agree with the validated exact reconciliation.
+        pattern = (r'^Provision for credit losses \(a quarterly flow\) was \$(?P<provision>[0-9.]+) billion '
+                   r'for April[\u2013-]June 2026, net charge[-\u2010\u2011\u2012\u2013]offs \(a quarterly flow\) were '
+                   r'\$(?P<chargeoffs>[0-9.]+) billion, resulting in a disclosed net addition to the allowance '
+                   r'of \$(?P<addition>[0-9,]+) million for the quarter\.')
+        match = re.match(pattern, value)
+        if match:
+            row = next(r for r in report['reconciliation'] if r['id'] == 'credit_net_addition:current')
+            provision = Decimal(row['operands'][0]['value'])
+            chargeoffs = Decimal(row['operands'][1]['value'])
+            addition = Decimal(row['result'])
+            if (row['unit'] != 'USD millions' or row['period'] != {'start':'2026-04-01','end':'2026-06-30'}
+                    or (provision/1000).quantize(Decimal('.1'), rounding=ROUND_HALF_UP) != Decimal(match['provision'])
+                    or (chargeoffs/1000).quantize(Decimal('.1'), rounding=ROUND_HALF_UP) != Decimal(match['chargeoffs'])
+                    or addition != Decimal(match['addition'].replace(',', '')) or provision-chargeoffs != addition):
+                raise GateError('Rounded credit wording differs from exact source reconciliation')
+            prefix = (f'For April-June 2026, the source discloses rounded quarterly flows of '
+                      f'${match["provision"]} billion provision for credit losses and ${match["chargeoffs"]} billion net charge-offs. '
+                      f'Using exact USD millions, provision of ${provision:,.0f} million minus net charge-offs of '
+                      f'${chargeoffs:,.0f} million equals the disclosed net addition of ${addition:,.0f} million '
+                      f'(${provision:,.0f}M - ${chargeoffs:,.0f}M = ${addition:,.0f}M); '
+                      'the rounded billion-dollar disclosures are not the inputs to that exact subtraction.')
+            value = prefix + value[match.end():]
+    return value
+
+
+def render_banking_main(report, view):
+    """Concise investor view: original AI notes distinguished from Python facts."""
+    base = render_financial_main(view)
+    def section(first, last): return base.split(first, 1)[1].split(last, 1)[0].strip()
+    lines = [base.split('## Financial highlights')[0].replace(
+        '**Deterministic financial foundation. Human review pending; no AI interpretation.**',
+        '**Automated investor draft. Oracle, semantic and presentation human reviews pending.**').strip(),
+        '', '## Executive summary', '', section('## Financial highlights', 'Highlight B amounts'), '',
+        '## GAAP financial highlights', '',
+        'Financial values and changes are deterministic. B = USD billions, rounded to one decimal; tables show exact USD millions and USD per share.', '',
+        '### Quarterly YoY performance', '', section('## Quarterly YoY performance', '## Loans and deposits since year-end'), '',
+        '## Loans and deposits since year-end', '', section('## Loans and deposits since year-end', 'Loans less the separately presented allowance'), '',
+        'The following sections contain AI-generated interpretation of cited SEC disclosures; they remain subject to human semantic review.', '']
+    headings = {'reported_vs_managed': 'Reported versus managed context', 'credit_loss_measures': 'Credit-loss analysis',
+                'significant_earnings_items': 'Significant earnings items'}
+    for n in report['notes']:
+        lines += ['## '+headings[n['id']], '', presented_banking_note(n, report), '', references(view, [n['id']]), '']
+    lines += ['[Accounting reconciliations, scopes and exact source quotations](supporting_detail.md).', '',
+        '## Source references', '', base.split('## Source references', 1)[1].strip()]
+    return '\n'.join(lines)+'\n'
+
+
+def build_banking_presentation(report, raw, extraction, payload, metadata):
+    from src.ai.report_assembly import assemble_financials, assemble
+    if assemble(raw, extraction['evidence'], 'jpm_2026_q2') != report:
+        raise GateError('Banking report differs from original response')
+    foundation = assemble_financials(extraction, payload, metadata)
+    view = build_financial_presentation(foundation, extraction, payload, metadata)
+    refs = {s['evidence_id']: ref for ref, s in view['sources'].items()}
+    for n in report['notes']:
+        view['claims'][n['id']] = copy.deepcopy(n)
+        for c in view['claims'][n['id']]['citations']: c['reference'] = refs[c['evidence_id']]
+    return view
+
+
+def render_banking_details(report, view):
+    lines = [render_financial_details(view), '', '## Deterministic accounting reconciliations', '',
+        'All amounts USD millions. This is not a complete allowance rollforward.', '',
+        '| Identity | Period | Calculation |', '|---|---|---|']
+    for r in report['reconciliation']:
+        terms = [('' if i == 0 else ' + ' if t['coefficient'] == 1 else ' - ')+t['label']+' '+_financial_exact(t['value'])
+                 for i,t in enumerate(r['operands'])]
+        lines.append('| '+r['label']+' | '+_financial_period(r['period'])+' | '+''.join(terms)+' = '+r['result_label']+' '+_financial_exact(r['result'])+' |')
+    for n in report['notes']: lines += ['', '## AI interpretation: '+n['id'], '', presented_banking_note(n, report), '', references(view, [n['id']])]
+    return '\n'.join(lines)+'\n'

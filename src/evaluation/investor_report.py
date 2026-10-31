@@ -7,6 +7,67 @@ from src.analytics.investor_report import LABELS, SOURCE_LABELS, render_main, re
 from src.analytics.report_profiles import segment_ids
 
 
+def evaluate_banking_presentation(report, raw, extraction, view, main, detail, *, payload, metadata, evaluation):
+    from src.analytics.investor_report import build_banking_presentation, render_banking_main, render_banking_details
+    failures = []
+    try:
+        expected = build_banking_presentation(report, raw, extraction, payload, metadata)
+        if view != expected: failures.append('Changed banking presentation/source references')
+        if main != render_banking_main(report, expected): failures.append('Changed investor report')
+        if detail != render_banking_details(report, expected): failures.append('Changed supporting detail')
+    except (ValueError, KeyError, TypeError) as exc:
+        failures.append('Invalid banking presentation: '+str(exc))
+    if evaluation.get('evaluation_version') != 'm006-ai-eval-v1' or not evaluation.get('automatic_pass') or evaluation.get('overall_pass'):
+        failures.append('Banking automatic gate must pass; human approval remains pending')
+    return {'evaluation_version': 'm006-ai-presentation-v1', 'automatic_pass': not failures,
+        'overall_pass': False, 'review_status': 'pending_manual_review', 'failures': failures}
+
+
+def evaluate_financial_presentation(report, extraction, view, report_text, detail_text, *,
+                                    payload, metadata, financial_evaluation):
+    """M006 financial-only presentation checks, separate from AI approval."""
+    from src.analytics.investor_report import (build_financial_presentation,
+        render_financial_main, render_financial_details)
+    failures = []
+    expected = None
+    try:
+        expected = build_financial_presentation(report, extraction, payload, metadata)
+    except (ValueError, KeyError, TypeError) as exc:
+        failures.append('Source-bound presentation: '+str(exc))
+    if expected is None or view != expected:
+        failures.append('Financial view changed values, units, periods, scopes, claims or references')
+    if expected is not None:
+        if report_text != render_financial_main(expected): failures.append('Main financial presentation changed')
+        if detail_text != render_financial_details(expected): failures.append('Financial supporting detail changed')
+    gate = financial_evaluation
+    if (not isinstance(gate, dict) or gate.get('evaluation_version') != 'm006-financial-eval-v1'
+            or gate.get('automatic_pass') is not True or gate.get('overall_pass') is not False
+            or gate.get('financial_values') != {'passed': 16, 'total': 16}
+            or gate.get('yoy_changes') != {'passed': 6, 'total': 6}
+            or gate.get('since_year_end_changes') != {'passed': 2, 'total': 2}
+            or gate.get('period_unit_scope_checks') != {'passed': 8, 'total': 8}
+            or gate.get('table_evidence_support') != {'passed': 8, 'total': 8}
+            or gate.get('reconciliation') != {'passed': 14, 'total': 14}
+            or gate.get('source_bound_report_pass') is not True or gate.get('source_integrity_pass') is not True
+            or gate.get('failures') != []):
+        failures.append('Independent financial gate is missing, failed or inconsistent')
+    if isinstance(report_text, str):
+        balance = report_text.partition('## Loans and deposits since year-end')[2].partition('## Reported versus managed')[0]
+        if not balance or 'YoY' in balance or 'Change since year-end' not in balance:
+            failures.append('Balance comparison labeling')
+        if not all(s in balance for s in ('June 30, 2026', 'December 31, 2025', 'USD millions')):
+            failures.append('Balance dates/units')
+        if not all(s in report_text for s in ('USD per share', 'FTE adjustment', 'GAAP reported',
+            'Human review pending', '## Significant earnings items', '## Source references')):
+            failures.append('Missing banking context, units or review status')
+    else:
+        failures.append('Missing financial Markdown')
+    return {'evaluation_version': 'm006-financial-presentation-eval-v1',
+        'automatic_pass': not failures, 'overall_pass': False,
+        'review_status': 'pending_manual_review', 'failures': failures,
+        'limitations': 'Deterministic financial foundation only; no AI narrative or human approval.'}
+
+
 def evaluate_presentation(bundle, view, report_text, detail_text):
     failures = []
     def check(condition, message):

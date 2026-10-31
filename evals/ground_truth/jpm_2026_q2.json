@@ -1,0 +1,654 @@
+{
+  "schema_version": 2,
+  "oracle_contract": "m006-jpm-oracle-v1",
+  "milestone": "M006",
+  "report": {
+    "company": "JPMorgan Chase & Co.",
+    "cik": "0000019617",
+    "form": "10-Q",
+    "accession": "0001628280-26-054343",
+    "fiscal_period": "FY2026 Q2",
+    "period_end": "2026-06-30",
+    "filing_date": "2026-08-06",
+    "document": "jpm-20260630.htm",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+    "filing_date_source": {
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/0001628280-26-054343-index.html",
+      "section": "SEC filing detail",
+      "location": "Filing Date 2026-08-06; Period of Report 2026-06-30; CIK 0000019617; primary document jpm-20260630.htm"
+    }
+  },
+  "source_snapshot": {
+    "path": "data/raw/sec/filings/JPM/0001628280-26-054343/20261031T143819Z_75e02668ad64.html",
+    "sha256": "75e02668ad64cef396ee9f9b10a8982f70f8e1c6879b833be9eae0e02f599d6b",
+    "size_bytes": 11513994,
+    "metadata_path": "data/raw/sec/filings/JPM/0001628280-26-054343/20261031T143819Z_75e02668ad64.metadata.json",
+    "filing_detail_path": "data/raw/sec/filing_details/JPM/0001628280-26-054343/20261031T143819Z_955d3ff42604.html",
+    "filing_detail_sha256": "955d3ff42604c9e8e6311914094ad1ae25ee37bba4ea5ced8aff476f82e08782",
+    "filing_detail_metadata_path": "data/raw/sec/filing_details/JPM/0001628280-26-054343/20261031T143819Z_955d3ff42604.metadata.json",
+    "quote_normalization": "BeautifulSoup lxml; remove head/script/style/ix:header/ix:hidden/noscript; get_text separator space; collapse whitespace; offsets address that normalized source text, not HTML bytes"
+  },
+  "periods": {
+    "current": {
+      "fiscal_period": "FY2026 Q2",
+      "start": "2026-04-01",
+      "end": "2026-06-30"
+    },
+    "prior": {
+      "fiscal_period": "FY2025 Q2",
+      "start": "2025-04-01",
+      "end": "2025-06-30"
+    },
+    "balance_current": {
+      "as_of": "2026-06-30"
+    },
+    "balance_prior": {
+      "as_of": "2025-12-31"
+    }
+  },
+  "metrics": [
+    {
+      "id": "total_net_revenue",
+      "label": "Total net revenue",
+      "unit": "USD millions",
+      "gaap_status": "GAAP reported",
+      "kind": "flow",
+      "scope": "JPMorgan Chase & Co. consolidated reported net revenue, net of interest expense",
+      "comparison": "yoy",
+      "current": {
+        "value": "57347",
+        "period": {
+          "fiscal_period": "FY2026 Q2",
+          "start": "2026-04-01",
+          "end": "2026-06-30"
+        }
+      },
+      "prior": {
+        "value": "44912",
+        "period": {
+          "fiscal_period": "FY2025 Q2",
+          "start": "2025-04-01",
+          "end": "2025-06-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1 / Consolidated financial statements",
+        "page": 93,
+        "table": "Consolidated statements of income (unaudited)",
+        "row": "Total net revenue",
+        "columns": "Three months ended June 30: 2026 / 2025; exclude six-month YTD columns"
+      }
+    },
+    {
+      "id": "net_interest_income",
+      "label": "Net interest income",
+      "unit": "USD millions",
+      "gaap_status": "GAAP reported",
+      "kind": "flow",
+      "scope": "JPMorgan Chase & Co. consolidated reported net interest income",
+      "comparison": "yoy",
+      "current": {
+        "value": "25511",
+        "period": {
+          "fiscal_period": "FY2026 Q2",
+          "start": "2026-04-01",
+          "end": "2026-06-30"
+        }
+      },
+      "prior": {
+        "value": "23209",
+        "period": {
+          "fiscal_period": "FY2025 Q2",
+          "start": "2025-04-01",
+          "end": "2025-06-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1 / Consolidated financial statements",
+        "page": 93,
+        "table": "Consolidated statements of income (unaudited)",
+        "row": "Net interest income",
+        "columns": "Three months ended June 30: 2026 / 2025; exclude six-month YTD columns"
+      }
+    },
+    {
+      "id": "noninterest_revenue",
+      "label": "Noninterest revenue",
+      "unit": "USD millions",
+      "gaap_status": "GAAP reported",
+      "kind": "flow",
+      "scope": "JPMorgan Chase & Co. consolidated reported noninterest revenue",
+      "comparison": "yoy",
+      "current": {
+        "value": "31836",
+        "period": {
+          "fiscal_period": "FY2026 Q2",
+          "start": "2026-04-01",
+          "end": "2026-06-30"
+        }
+      },
+      "prior": {
+        "value": "21703",
+        "period": {
+          "fiscal_period": "FY2025 Q2",
+          "start": "2025-04-01",
+          "end": "2025-06-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1 / Consolidated financial statements",
+        "page": 93,
+        "table": "Consolidated statements of income (unaudited)",
+        "row": "Noninterest revenue",
+        "columns": "Three months ended June 30: 2026 / 2025; exclude six-month YTD columns"
+      }
+    },
+    {
+      "id": "net_income",
+      "label": "Net income",
+      "unit": "USD millions",
+      "gaap_status": "GAAP reported",
+      "kind": "flow",
+      "scope": "JPMorgan Chase & Co. consolidated net income; not income applicable to common stockholders",
+      "comparison": "yoy",
+      "current": {
+        "value": "21155",
+        "period": {
+          "fiscal_period": "FY2026 Q2",
+          "start": "2026-04-01",
+          "end": "2026-06-30"
+        }
+      },
+      "prior": {
+        "value": "14987",
+        "period": {
+          "fiscal_period": "FY2025 Q2",
+          "start": "2025-04-01",
+          "end": "2025-06-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1 / Consolidated financial statements",
+        "page": 93,
+        "table": "Consolidated statements of income (unaudited)",
+        "row": "Net income",
+        "columns": "Three months ended June 30: 2026 / 2025; exclude six-month YTD columns"
+      }
+    },
+    {
+      "id": "diluted_eps",
+      "label": "Diluted earnings per share",
+      "unit": "USD per share",
+      "gaap_status": "GAAP reported",
+      "kind": "flow",
+      "scope": "JPMorgan Chase & Co. reported diluted earnings per common share",
+      "comparison": "yoy",
+      "current": {
+        "value": "7.70",
+        "period": {
+          "fiscal_period": "FY2026 Q2",
+          "start": "2026-04-01",
+          "end": "2026-06-30"
+        }
+      },
+      "prior": {
+        "value": "5.24",
+        "period": {
+          "fiscal_period": "FY2025 Q2",
+          "start": "2025-04-01",
+          "end": "2025-06-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1 / Consolidated financial statements",
+        "page": 93,
+        "table": "Consolidated statements of income (unaudited)",
+        "row": "Diluted earnings per share",
+        "columns": "Three months ended June 30: 2026 / 2025; exclude six-month YTD columns"
+      }
+    },
+    {
+      "id": "provision_for_credit_losses",
+      "label": "Provision for credit losses",
+      "unit": "USD millions",
+      "gaap_status": "GAAP reported",
+      "kind": "flow",
+      "scope": "JPMorgan Chase & Co. consolidated credit-loss provision expense; not charge-offs or allowance stock",
+      "comparison": "yoy",
+      "current": {
+        "value": "2515",
+        "period": {
+          "fiscal_period": "FY2026 Q2",
+          "start": "2026-04-01",
+          "end": "2026-06-30"
+        }
+      },
+      "prior": {
+        "value": "2849",
+        "period": {
+          "fiscal_period": "FY2025 Q2",
+          "start": "2025-04-01",
+          "end": "2025-06-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1 / Consolidated financial statements",
+        "page": 93,
+        "table": "Consolidated statements of income (unaudited)",
+        "row": "Provision for credit losses",
+        "columns": "Three months ended June 30: 2026 / 2025; exclude six-month YTD columns"
+      }
+    },
+    {
+      "id": "total_loans",
+      "label": "Loans (included $ 62,889 and $ 70,684 at fair value)",
+      "unit": "USD millions",
+      "gaap_status": "GAAP reported",
+      "kind": "point_in_time",
+      "scope": "JPMorgan Chase & Co. consolidated Loans row, including held-for-sale and fair-value loans, before separately presented loan-loss allowance; not retained loans, net loans or average loans",
+      "comparison": "since_year_end",
+      "current": {
+        "value": "1542462",
+        "period": {
+          "as_of": "2026-06-30"
+        }
+      },
+      "prior": {
+        "value": "1493429",
+        "period": {
+          "as_of": "2025-12-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1 / Consolidated financial statements",
+        "page": 95,
+        "table": "Consolidated balance sheets (unaudited)",
+        "row": "Loans (included $ 62,889 and $ 70,684 at fair value)",
+        "columns": "June 30, 2026 / December 31, 2025"
+      }
+    },
+    {
+      "id": "total_deposits",
+      "label": "Deposits (included $ 26,229 and $ 20,930 at fair value)",
+      "unit": "USD millions",
+      "gaap_status": "GAAP reported",
+      "kind": "point_in_time",
+      "scope": "JPMorgan Chase & Co. consolidated deposit liabilities; not deposits with banks or average deposits",
+      "comparison": "since_year_end",
+      "current": {
+        "value": "2713700",
+        "period": {
+          "as_of": "2026-06-30"
+        }
+      },
+      "prior": {
+        "value": "2559320",
+        "period": {
+          "as_of": "2025-12-31"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1 / Consolidated financial statements",
+        "page": 95,
+        "table": "Consolidated balance sheets (unaudited)",
+        "row": "Deposits (included $ 26,229 and $ 20,930 at fair value)",
+        "columns": "June 30, 2026 / December 31, 2025"
+      }
+    }
+  ],
+  "reported_to_managed": [
+    {
+      "metric_id": "noninterest_revenue",
+      "unit": "USD millions",
+      "current": {
+        "reported": "31836",
+        "fte_adjustment": "564",
+        "managed": "32400",
+        "period": {
+          "fiscal_period": "FY2026 Q2",
+          "start": "2026-04-01",
+          "end": "2026-06-30"
+        }
+      },
+      "prior": {
+        "reported": "21703",
+        "fte_adjustment": "663",
+        "managed": "22366",
+        "period": {
+          "fiscal_period": "FY2025 Q2",
+          "start": "2025-04-01",
+          "end": "2025-06-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 2 / Non-GAAP financial measures",
+        "page": 18,
+        "table": "Reconciliation from reported U.S. GAAP results to managed basis",
+        "row": "Total noninterest revenue",
+        "columns": "Three months ended June 30: 2026 / 2025; Reported / Fully taxable-equivalent adjustments / Managed basis"
+      }
+    },
+    {
+      "metric_id": "net_interest_income",
+      "unit": "USD millions",
+      "current": {
+        "reported": "25511",
+        "fte_adjustment": "111",
+        "managed": "25622",
+        "period": {
+          "fiscal_period": "FY2026 Q2",
+          "start": "2026-04-01",
+          "end": "2026-06-30"
+        }
+      },
+      "prior": {
+        "reported": "23209",
+        "fte_adjustment": "105",
+        "managed": "23314",
+        "period": {
+          "fiscal_period": "FY2025 Q2",
+          "start": "2025-04-01",
+          "end": "2025-06-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 2 / Non-GAAP financial measures",
+        "page": 18,
+        "table": "Reconciliation from reported U.S. GAAP results to managed basis",
+        "row": "Net interest income",
+        "columns": "Three months ended June 30: 2026 / 2025; Reported / Fully taxable-equivalent adjustments / Managed basis"
+      }
+    },
+    {
+      "metric_id": "total_net_revenue",
+      "unit": "USD millions",
+      "current": {
+        "reported": "57347",
+        "fte_adjustment": "675",
+        "managed": "58022",
+        "period": {
+          "fiscal_period": "FY2026 Q2",
+          "start": "2026-04-01",
+          "end": "2026-06-30"
+        }
+      },
+      "prior": {
+        "reported": "44912",
+        "fte_adjustment": "768",
+        "managed": "45680",
+        "period": {
+          "fiscal_period": "FY2025 Q2",
+          "start": "2025-04-01",
+          "end": "2025-06-30"
+        }
+      },
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 2 / Non-GAAP financial measures",
+        "page": 18,
+        "table": "Reconciliation from reported U.S. GAAP results to managed basis",
+        "row": "Total net revenue",
+        "columns": "Three months ended June 30: 2026 / 2025; Reported / Fully taxable-equivalent adjustments / Managed basis"
+      }
+    }
+  ],
+  "supporting_values": {
+    "net_income_applicable_to_common_stockholders": {
+      "unit": "USD millions",
+      "current": "20752",
+      "prior": "14630",
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1",
+        "page": 93,
+        "table": "Consolidated statements of income (unaudited)",
+        "row": "Net income applicable to common stockholders",
+        "columns": "Quarter-only: 2026 / 2025"
+      }
+    },
+    "loan_loss_allowance_signed": {
+      "unit": "USD millions",
+      "current": "-26152",
+      "prior": "-25765",
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1",
+        "page": 95,
+        "table": "Consolidated balance sheets (unaudited)",
+        "row": "Allowance for loan losses",
+        "columns": "June 30, 2026 / December 31, 2025"
+      }
+    },
+    "net_loans": {
+      "unit": "USD millions",
+      "current": "1516310",
+      "prior": "1467664",
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 1",
+        "page": 95,
+        "table": "Consolidated balance sheets (unaudited)",
+        "row": "Loans, net of allowance for loan losses",
+        "columns": "June 30, 2026 / December 31, 2025"
+      }
+    },
+    "net_charge_offs": {
+      "unit": "USD millions",
+      "current": "2366",
+      "prior": "2410",
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 2",
+        "page": 3,
+        "table": "Consolidated Financial Highlights",
+        "row": "Net charge-offs",
+        "columns": "2Q26 / 2Q25; not adjacent 1Q26 or six-month columns"
+      }
+    },
+    "net_addition_to_allowance": {
+      "unit": "USD millions",
+      "current": "149",
+      "prior": "439",
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 2",
+        "page": 12,
+        "table": "Provision for credit losses discussion",
+        "row": "Quarterly results",
+        "columns": "2026 / 2025; exact millions from prose, not rounded billions"
+      }
+    },
+    "firmwide_allowance": {
+      "unit": "USD millions",
+      "current": "31531",
+      "prior": "31230",
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 2",
+        "page": 3,
+        "table": "Consolidated Financial Highlights",
+        "row": "Allowances for credit losses",
+        "columns": "2Q26 / 4Q25; point-in-time, not provision"
+      }
+    },
+    "allowance_components_current": {
+      "as_of": "2026-06-30",
+      "unit": "USD millions",
+      "loan_losses": "26152",
+      "lending_related_commitments": "5151",
+      "investment_securities": "63",
+      "cib_accounts_receivable": "165",
+      "principal_table_total": "31366",
+      "firmwide_total": "31531",
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 2",
+        "page": 76,
+        "table": "Allowance for credit losses and related information, footnote (b)",
+        "row": "Total allowance and separate CIB receivables allowance",
+        "columns": "June 30, 2026; not June 30, 2025"
+      }
+    },
+    "net_income_managed": {
+      "unit": "USD millions",
+      "current": "21155",
+      "prior": "14987",
+      "source": {
+        "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+        "section": "Part I, Item 2",
+        "page": 18,
+        "table": "Reconciliation from reported U.S. GAAP results to managed basis",
+        "row": "Net income",
+        "columns": "2026 / 2025; managed equals reported; FTE adjustment shown NA"
+      }
+    }
+  },
+  "qualitative_review_cases": [
+    {
+      "id": "reported_vs_managed",
+      "question": "Does each claim distinguish reported GAAP from managed/FTE basis, preserve the two quarter columns and avoid implying that FTE adjustments increase net income?",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+          "section": "Part I, Item 2 / Non-GAAP financial measures",
+          "page": 18,
+          "location": "The Firm prepares its Consolidated Financial Statements in accordance with U.S. GAAP",
+          "quote": "The Firm prepares its Consolidated Financial Statements in accordance with U.S. GAAP and this presentation is referred to as “reported” basis; these financial statements appear on pages 93-97. In addition to analyzing the Firm’s results on a reported basis, the Firm also reviews and uses certain non-GAAP financial measures at the Firmwide and segment level. These non-GAAP measures include: • Firmwide “managed” basis results, including the overhead ratio, which include certain reclassifications to present total net revenue from investments that receive tax credits and tax-exempt securities on a basis comparable to taxable investments and securities (“FTE” basis). The corresponding income tax impact related to tax-exempt items is recorded within income tax expense. These adjustments have no impact on net income as reported by the Firm as a whole or by the LOBs;",
+          "start_char": 55292,
+          "end_char": 56163,
+          "quote_sha256": "16afbe3fdce4ca4c92465838d61f8623183daaa44f4775906187cd45c94f39f0"
+        }
+      ]
+    },
+    {
+      "id": "credit_loss_measures",
+      "question": "Does the note distinguish provision expense, net charge-offs, period additions and point-in-time allowance stocks, preserve source rounding, and avoid treating provision-minus-charge-offs as a complete balance rollforward?",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+          "section": "Part I, Item 2 / Provision for credit losses",
+          "page": 12,
+          "location": "Quarterly results The provision for credit losses was $2.5 billion.",
+          "quote": "Quarterly results The provision for credit losses was $2.5 billion. Net charge-offs were $2.4 billion and the net addition to the allowance for credit losses was $149 million. The provision for credit losses included: • $2.2 billion in consumer , reflecting net charge-offs of $2.2 billion, predominantly driven by Card Services, primarily due to loan growth. The allowance for credit losses was relatively flat, and • $361 million in wholesale , driven by a net increase in the loan portfolio and changes in the credit quality of certain exposures, partially offset by a reduction in the allowance with respect to certain accounts receivable and an update to loss assumptions on certain loans in Markets. Net charge-offs were $209 million and the net addition to the allowance for credit losses was $152 million. In the prior year, the provision was $2.8 billion, net charge-offs were $2.4 billion and the net addition to the allowance for credit losses was $439 million.",
+          "start_char": 39553,
+          "end_char": 40525,
+          "quote_sha256": "4e0aa7ba6c89bc06b25f7b59708f50a3c6e5e812dcb114ecc11fabe7559857c6"
+        }
+      ]
+    },
+    {
+      "id": "significant_earnings_items",
+      "question": "Does the note identify the disclosed USD 4.6 billion net Visa-related gain in Corporate and USD 1.0 billion other equity gains in Corporate/CIB, without calling reported growth recurring or deriving undisclosed adjusted earnings?",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+          "section": "Part I, Item 2 / Executive overview",
+          "page": 5,
+          "location": "The Firm's results included a $4.6 billion",
+          "quote": "The Firm's results included a $4.6 billion net gain related to Visa shares in Corporate and $1.0 billion of gains on certain equity investments in Corporate and CIB.",
+          "start_char": 20240,
+          "end_char": 20405,
+          "quote_sha256": "9201eacb4280efdf6503e6fac5fd45515cebb546190d3e221ab00543bebc6f5a"
+        }
+      ]
+    }
+  ],
+  "supporting_evidence": [
+    {
+      "id": "allowance_scope",
+      "question": "Is the separate CIB accounts-receivable allowance included when reconciling to the broader firmwide allowance?",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+          "section": "Part I, Item 2 / Allowance for credit losses",
+          "page": 76,
+          "location": "At June 30, 2026 and 2025, in addition to the allowance for credit losses in the table above,",
+          "quote": "At June 30, 2026 and 2025, in addition to the allowance for credit losses in the table above, the Firm also had an allowance for credit losses of $165 million and $288 million, respectively, associated with certain accounts receivable in CIB.",
+          "start_char": 228594,
+          "end_char": 228836,
+          "quote_sha256": "51015d3f74026a4c91a3f3669a5c6cd5765beddebdf58667986fb8b183bee247"
+        }
+      ]
+    },
+    {
+      "id": "capital_entity",
+      "question": "Are the Firm and bank subsidiary distinguished, and is the Standardized column selected consistently at both dates?",
+      "status": "pending_manual_review",
+      "conclusion": null,
+      "evidence_locations": [
+        {
+          "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+          "section": "Part I, Item 2 / Capital Risk Management",
+          "page": 46,
+          "location": "Selected capital and RWA data The following tables present the Firm",
+          "quote": "Selected capital and RWA data The following tables present the Firm’s risk-based capital metrics under both the Standardized and Advanced approaches and leverage-based capital metrics. Refer to Capital Risk Management on pages 89–99 of JPMorganChase’s 2025 Form 10-K for a further discussion of these capital metrics. Refer to Note 21 for JPMorgan Chase Bank, N.A.’s risk-based and leverage-based capital metrics.",
+          "start_char": 129590,
+          "end_char": 130003,
+          "quote_sha256": "f32c7c5ee2470d802b385c419dfe5c08a94ef201939c11557141dfedd64a6d61"
+        }
+      ]
+    }
+  ],
+  "optional_capital_note": {
+    "headline_metric": false,
+    "label": "CET1 capital ratio",
+    "unit": "percent",
+    "entity": "JPMorgan Chase & Co. consolidated (the Firm), not JPMorgan Chase Bank, N.A.",
+    "regulatory_basis": "Standardized",
+    "kind": "point_in_time",
+    "current": {
+      "value": "14.2",
+      "period": {
+        "as_of": "2026-06-30"
+      }
+    },
+    "prior": {
+      "value": "14.6",
+      "period": {
+        "as_of": "2025-12-31"
+      }
+    },
+    "change_basis_points": "-40",
+    "precision_note": "Change calculated from the disclosed one-decimal ratio levels; not a reconstructed unrounded regulatory ratio.",
+    "source": {
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm",
+      "section": "Part I, Item 2 / Capital Risk Management",
+      "page": 46,
+      "table": "Selected capital and RWA data",
+      "row": "CET1 capital ratio",
+      "columns": "Standardized: June 30, 2026 / December 31, 2025; exclude requirements and Advanced columns"
+    },
+    "status": "pending_manual_review",
+    "review_question": "Confirm consolidated reporting entity and Standardized approach at both dates; distinguish actual ratios from requirements and express the change as basis points, not percentage growth."
+  },
+  "verification": {
+    "method": "Manually transcribed after direct inspection of original pinned SEC statement and reconciliation tables. No production parser, AI output, generated report or CompanyFacts observation supplied oracle values. CompanyFacts may be used only for a separate cross-check.",
+    "human_review_status": "pending_manual_review",
+    "independent_of_production_extraction": true,
+    "limitations": [
+      "Provision minus net charge-offs equals disclosed period net addition; this is not a complete beginning-to-ending allowance balance rollforward.",
+      "The supporting broad allowance total includes CIB accounts receivable outside the principal allowance table. Loan allowance alone is not total ACL.",
+      "No undisclosed adjusted net income or EPS is calculated from the Visa gain.",
+      "CET1 is an optional verified source note, not a ninth headline metric.",
+      "No numerical business-segment contract is included."
+    ]
+  }
+}

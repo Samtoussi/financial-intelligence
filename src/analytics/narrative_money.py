@@ -80,15 +80,17 @@ def _source_values(quotes):
     return supported
 
 
-def validate_monetary_narrative(text, quotes):
+def validate_monetary_narrative(text, quotes, *, supported_values=None):
     """Return a diagnostic; source citation validation remains the caller's job.
 
     Supports currency-prefixed amounts and amounts written in dollars/USD.
     Unknown or unsupported monetary expressions fail; percentages and bare years
     are not currency claims. Human review still checks meaning and attribution.
+    Callers may supply independently source-bound typed values; omission retains
+    the unchanged CAT evidence-table/prose behavior.
     """
     matches = list(MONEY.finditer(text))
-    supported = _source_values(quotes)
+    supported = _source_values(quotes) if supported_values is None else set(supported_values)
     claims, errors = [], []
     resolved = []
     for i, match in enumerate(matches):

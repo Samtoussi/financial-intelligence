@@ -33,6 +33,126 @@ def decimal_value(value):
         return None
 
 
+def evaluate_financials(report, extraction, ground_truth, *, payload, metadata):
+    """Independent M006 financial checks plus source-bound assembly integrity.
+
+    No AI notes are expected or approved. The oracle is used here only, never
+    passed to production assembly. Existing MSFT/CAT evaluation is unchanged.
+    """
+    from src.ai.report_assembly import assemble_financials
+    from src.evaluation.jpm_ground_truth import validate_dataset
+    oracle_check = validate_dataset(ground_truth)
+    failures = []
+    canonical = None
+    try:
+        canonical = assemble_financials(extraction, payload, metadata)
+    except (ValueError, KeyError, TypeError) as exc:
+        failures.append('Source/extraction validation: ' + str(exc))
+    if not isinstance(report, dict):
+        report = {}
+    canonical_match = canonical is not None and report == canonical
+    if not canonical_match:
+        failures.append('Report differs from source-bound deterministic assembly (including scopes, units, references or unsupported claims)')
+    metrics = report.get('metrics', [])
+    if not isinstance(metrics, list): metrics = []
+    actual = {m.get('id'): m for m in metrics if isinstance(m, dict)}
+    source_metrics = {m['id']: m for m in canonical['metrics']} if canonical else {}
+    source_pairs = sum(m == source_metrics.get(mid) for mid, m in actual.items() if mid in source_metrics)
+    values, yoy, stocks, period_units = 0, 0, 0, 0
+    for o in ground_truth['metrics']:
+        m = actual.get(o['id'], {})
+        for p in ('current', 'prior'):
+            if isinstance(m.get(p), str) and m[p] == o[p]['value']:
+                values += 1
+        expected_periods = {p: {k: v for k, v in o[p]['period'].items() if k != 'fiscal_period'}
+                            for p in ('current', 'prior')}
+        if (m.get('periods') == expected_periods and m.get('unit') == o['unit']
+                and m.get('kind') == o['kind'] and m.get('comparison') == o['comparison']
+                and m.get('source_label') == o['label'] and m.get('gaap_status') == o['gaap_status']):
+            period_units += 1
+        if m.get('change_percent') == oracle_check['changes'][o['id']]['percent']:
+            if o['kind'] == 'flow': yoy += 1
+            else: stocks += 1
+    if (values, yoy, stocks, period_units) != (16, 6, 2, 8) or len(metrics) != 8 or len(actual) != 8:
+        failures.append('Independent metric/period/unit/change comparison failed')
+
+    # Build independent expected accounting operands from the manually
+    # transcribed oracle, not from production reconciliation output.
+    om = {m['id']: m for m in ground_truth['metrics']}
+    support = ground_truth['supporting_values']
+    expected = {}
+    for p in ('current', 'prior'):
+        expected['reported_revenue:'+p] = ([om[mid][p]['value'] for mid in ('net_interest_income', 'noninterest_revenue')], [1, 1], om['total_net_revenue'][p]['value'])
+        for b in ground_truth['reported_to_managed']:
+            v = b[p]
+            expected['managed:'+b['metric_id']+':'+p] = ([v['reported'], v['fte_adjustment']], [1, 1], v['managed'])
+        expected['credit_net_addition:'+p] = ([om['provision_for_credit_losses'][p]['value'], support['net_charge_offs'][p]], [1, -1], support['net_addition_to_allowance'][p])
+        expected['net_loans:'+p] = ([om['total_loans'][p]['value'], str(-Decimal(support['loan_loss_allowance_signed'][p]))], [1, -1], support['net_loans'][p])
+    acl = support['allowance_components_current']
+    expected['principal_allowance:current'] = ([acl[k] for k in ('loan_losses', 'lending_related_commitments', 'investment_securities')], [1, 1, 1], acl['principal_table_total'])
+    expected['firmwide_allowance:current'] = ([acl['principal_table_total'], acl['cib_accounts_receivable']], [1, 1], acl['firmwide_total'])
+    rows = report.get('reconciliation', [])
+    if not isinstance(rows, list): rows = []
+    ar = {r.get('id'): r for r in rows if isinstance(r, dict)}
+    reconciled = 0
+    for rid, (operands, coefficients, result) in expected.items():
+        r = ar.get(rid, {})
+        p = rid.rsplit(':', 1)[1]
+        period_metric = om['total_loans'] if rid.startswith(('net_loans:', 'principal_allowance:', 'firmwide_allowance:')) else om['total_net_revenue']
+        period = {k: v for k, v in period_metric[p]['period'].items() if k != 'fiscal_period'}
+        try:
+            good = ([t['value'] for t in r['operands']] == operands
+                    and [t['coefficient'] for t in r['operands']] == coefficients
+                    and r['result'] == result and r['unit'] == 'USD millions' and r['period'] == period
+                    and sum(Decimal(t['value'])*Decimal(t['coefficient']) for t in r['operands']) == Decimal(result))
+        except (KeyError, TypeError, InvalidOperation):
+            good = False
+        reconciled += bool(good)
+    if reconciled != 14 or len(rows) != 14 or len(ar) != 14:
+        failures.append('Independent accounting reconciliation failed')
+    stock = report.get('allowance_stock', {})
+    if not isinstance(stock, dict): stock = {}
+    if any(stock.get(p) != support['firmwide_allowance'][p] for p in ('current', 'prior')):
+        failures.append('Independent firmwide allowance stock comparison failed')
+    return {'evaluation_version': 'm006-financial-eval-v1',
+        'financial_values': {'passed': values, 'total': 16},
+        'yoy_changes': {'passed': yoy, 'total': 6},
+        'since_year_end_changes': {'passed': stocks, 'total': 2},
+        'period_unit_scope_checks': {'passed': period_units, 'total': 8},
+        'table_evidence_support': {'passed': source_pairs, 'total': 8},
+        'reconciliation': {'passed': reconciled, 'total': 14},
+        'source_integrity_pass': canonical is not None, 'source_bound_report_pass': canonical_match,
+        'automatic_pass': not failures, 'overall_pass': False, 'failures': failures,
+        'manual_reviews': [{'id': rid, 'status': 'pending_manual_review'}
+                           for rid in ('oracle', 'semantic', 'presentation')],
+        'limitations': 'Financial foundation only. No AI interpretation, complete allowance rollforward or human approval.'}
+
+
+def evaluate_banking_response(raw, evidence, extraction, ground_truth, *, payload, metadata):
+    """Validate saved notes before AI-report assembly; oracle never enters context."""
+    from src.ai.report_assembly import prepare, assemble_financials
+    from src.analytics.jpm_narrative import validate_notes
+    foundation = assemble_financials(extraction, payload, metadata)
+    prepared = prepare(evidence, 'jpm_2026_q2')
+    financial = evaluate_financials(foundation, extraction, ground_truth, payload=payload, metadata=metadata)
+    narrative = validate_notes(raw, prepared)
+    source_ok = evidence == extraction['evidence'] and prepared['financial_foundation'] == foundation
+    return {'evaluation_version': 'm006-ai-eval-v1', 'financial': financial, 'narrative': narrative,
+        'source_context_pass': source_ok,
+        'automatic_pass': financial['automatic_pass'] and narrative['automatic_pass'] and source_ok,
+        'overall_pass': False,
+        'manual_reviews': [{'id': n, 'status': 'pending_manual_review'} for n in (
+            'reported_vs_managed', 'credit_loss_measures', 'significant_earnings_items')],
+        'limitations': 'Deterministic safeguards are bounded, not complete semantic entailment. Human oracle, semantic and presentation approval remain required.'}
+
+
+def evaluate_banking_report(report, raw, evidence, extraction, ground_truth, *, payload, metadata):
+    from src.ai.report_assembly import assemble
+    result = evaluate_banking_response(raw, evidence, extraction, ground_truth, payload=payload, metadata=metadata)
+    match = result['automatic_pass'] and assemble(raw, evidence, 'jpm_2026_q2') == report
+    return {**result, 'assembled_response_match': bool(match), 'automatic_pass': bool(match)}
+
+
 def valid_table_context(text, config):
     """Require the declared pair in table-header order, not merely elsewhere in a packet."""
     terms = table_context(config)

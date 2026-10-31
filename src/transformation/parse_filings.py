@@ -124,6 +124,41 @@ def quarterly_text(soup: BeautifulSoup, start: Tag, end: Tag) -> str:
     return text
 
 
+def jpm_quarterly_sections(soup: BeautifulSoup, metadata: dict) -> list[dict]:
+    """Observed JPM Q2 layout: resolve each range independently via TOC links.
+
+    Highlights/MD&A precede statements physically; Item numbers do not define
+    document order. Never use Part I Item 2 as the end of Item 1 here.
+    """
+    def destination(title):
+        links = [a for a in soup.find_all('a', href=True)
+                 if normalized_heading(a.get_text(' ', strip=True)) == title]
+        targets = {a['href'][1:] for a in links if a['href'].startswith('#')}
+        if len(targets) != 1:
+            raise ValueError('Missing/ambiguous JPM section link: ' + title)
+        target = targets.pop()
+        nodes = soup.find_all(id=target) or soup.find_all('a', attrs={'name': target})
+        if len(nodes) != 1:
+            raise ValueError('Missing/ambiguous JPM section destination: ' + title)
+        return nodes[0], target
+
+    ranges = (
+        ('I.1', 'financial statements', 'quantitative and qualitative disclosures about market risk'),
+        ('I.2', 'consolidated financial highlights', 'financial statements'),
+    )
+    records = []
+    for item, first, last in ranges:
+        start, start_id = destination(first)
+        end, end_id = destination(last)
+        text = quarterly_text(soup, start, end)
+        records.append({**{k: metadata[k] for k in (
+            'ticker', 'cik', 'accession', 'filing_date', 'report_date', 'form', 'source_url')},
+            'item': item, 'extraction_method': 'independent_toc_ranges',
+            'source_start_anchor': start_id, 'source_end_anchor': end_id,
+            'text': text, 'characters': len(text), 'words': len(text.split())})
+    return records
+
+
 def parse_html(payload: bytes) -> BeautifulSoup:
     soup = BeautifulSoup(payload, "lxml")
 
@@ -356,6 +391,10 @@ def parse_filing(
     soup = parse_html(payload)
 
     if form == "10-Q":
+        if ticker == 'JPM':
+            if metadata.get('accession') != '0001628280-26-054343' or metadata.get('cik') != 19617:
+                raise ValueError('Unsupported JPM quarterly filing')
+            return jpm_quarterly_sections(soup, metadata)
         if ticker not in {"MSFT", "CAT"}:
             raise ValueError("10-Q extraction currently supports MSFT and CAT only")
         starts = quarterly_boundaries(soup, cat_layout=ticker == 'CAT')

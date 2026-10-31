@@ -32,6 +32,19 @@ BOUNDARIES = [
     ("management_summary", "I.2", r"(?:FINANCI\s*AL\s+SUMMARY|SUMMARY RESULTS OF OPERATIONS)", r"\nOPERATING EXPENSES\n", False),
 ]
 DEFAULT_PROFILE = "msft_fy2027_q1"
+
+# M006 financial foundation only: semantic labels/scopes, no oracle values and
+# no generation profile. Mixed stock/flow comparisons remain explicit.
+JPM_FINANCIAL_SCOPES = {
+    'total_net_revenue': ('Total net revenue', 'Consolidated GAAP reported revenue, net of interest expense'),
+    'net_interest_income': ('Net interest income', 'Consolidated reported interest income less interest expense'),
+    'noninterest_revenue': ('Noninterest revenue', 'Consolidated GAAP reported noninterest revenue'),
+    'net_income': ('Net income', 'Consolidated net income, before preferred dividends and other common-stockholder adjustments'),
+    'diluted_eps': ('Diluted EPS', 'Consolidated diluted earnings per common share; USD per share'),
+    'provision_for_credit_losses': ('Provision for credit losses', 'Consolidated quarterly provision expense; distinct from net charge-offs and allowance stocks'),
+    'total_loans': ('Total loans before separately presented allowance', 'Consolidated balance-sheet loans, including disclosed fair-value loans; before the separate loan allowance; not retained, net or average loans'),
+    'total_deposits': ('Total deposit liabilities', 'Consolidated balance-sheet deposit liabilities; not asset deposits with banks'),
+}
 PROFILES = {DEFAULT_PROFILE: {"id": DEFAULT_PROFILE, "report": REPORT, "metrics": METRICS,
     "topics": TOPICS, "boundaries": BOUNDARIES, "ground_truth": "msft_fy2027_q1.json"}}
 second = deepcopy(PROFILES[DEFAULT_PROFILE])
@@ -125,3 +138,22 @@ cat['reconciliation_rows'] = [v[0] for v in list(cat['metrics'].values())[4:]] +
     'Total sales and revenues from reportable segments', 'All Other Segment',
     'Corporate Items and Eliminations', 'Total Sales and Revenues']
 PROFILES[cat['id']] = cat
+
+# M006: narrative-only profile; financial foundation remains authoritative.
+PROFILES['jpm_2026_q2'] = {
+    'id': 'jpm_2026_q2', 'contract': 'm006-v1',
+    'report': {'ticker': 'JPM', 'cik': 19617, 'form': '10-Q',
+        'accession': '0001628280-26-054343', 'fiscal_period': 'FY2026 Q2',
+        'period_start': '2026-04-01', 'period_end': '2026-06-30',
+        'prior_start': '2025-04-01', 'prior_end': '2025-06-30',
+        'filing_date': '2026-08-06', 'document': 'jpm-20260630.htm',
+        'source_url': 'https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm'},
+    'topics': {
+        'reported_vs_managed': 'Explain GAAP reported versus managed/FTE basis and net-income neutrality.',
+        'credit_loss_measures': 'Distinguish quarterly provision, net charge-offs and dated allowance stocks without inferring credit quality or a complete rollforward.',
+        'significant_earnings_items': 'Identify the disclosed Visa net gain and equity investment gains separately from recurring performance; do not invent adjusted earnings.'},
+    'topic_windows': {
+        'reported_vs_managed': ['reported_to_managed', 'income_statement'],
+        'credit_loss_measures': ['credit_context', 'credit_highlights', 'allowance_scope', 'income_statement', 'balance_sheet'],
+        'significant_earnings_items': ['significant_items', 'income_statement']},
+}
