@@ -1,0 +1,83 @@
+{
+  "format": "fi-public-verification-v1",
+  "report_id": "msft_fy2026_q1",
+  "identity": {
+    "ticker": "MSFT",
+    "form": "10-Q",
+    "accession": "0001193125-25-256321",
+    "fiscal_period": "FY2026 Q1",
+    "period_start": "2025-07-01",
+    "period_end": "2025-09-30",
+    "prior_start": "2024-07-01",
+    "prior_end": "2024-09-30"
+  },
+  "sources": [
+    {
+      "label": "Income statements · Part I, Item 1",
+      "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312525256321/msft-20250930.htm"
+    },
+    {
+      "label": "Segment disclosures · Part I, Item 1",
+      "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312525256321/msft-20250930.htm"
+    },
+    {
+      "label": "Segment reporting basis · Part I, Item 1",
+      "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312525256321/msft-20250930.htm"
+    },
+    {
+      "label": "Management discussion · Part I, Item 2",
+      "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312525256321/msft-20250930.htm"
+    }
+  ],
+  "derivation": {
+    "original_report_sha256": "a4f3f83b43d260989126ad1f25564bd87ea9b9c1586fbe05f0db2b5efad0c1d4",
+    "original_supporting_detail_sha256": "53b5371c4284e321bc6f5ed714040163f8750018f9eaebfa7e93080e6b637c99",
+    "changes": [
+      "Publication notice and public-detail link label added to report.",
+      "Supporting detail reduced to verified financial tables, concise accounting-context explanations and SEC links; extensive source excerpts and interpretation archives omitted.",
+      "Following focused content and attribution review, independently reworded the Cloud growth and margin takeaway; verified financial facts and the existing S4 citation are preserved. This publication edit is not covered by original presentation acceptance."
+    ],
+    "private_lineage": "Validated during curation using the strict local loader; private inputs are not included or rechecked by the public loader."
+  },
+  "saved_evaluation": {
+    "financial": {
+      "version": "m003-eval-v1",
+      "automatic_pass": true,
+      "counters": {
+        "financial_values": {
+          "passed": 14,
+          "total": 14
+        },
+        "yoy_changes": {
+          "passed": 7,
+          "total": 7
+        },
+        "table_evidence_support": {
+          "passed": 7,
+          "total": 7
+        }
+      },
+      "evidence_sha256": "2a173e3e3a07544a83a20129e8dd009da761addc8178ba3f56d319e0d80234c9"
+    },
+    "presentation": {
+      "version": "m004-a-eval-v2",
+      "automatic_pass": true,
+      "archived_overall_pass": false,
+      "evidence_sha256": "ae1e588e76640d2bf6683b8675d5ff981de82586a9dae851187f6d2d1d767dff"
+    }
+  },
+  "semantic_review": {
+    "state": "passed_saved_reviews",
+    "archived_state": "pass",
+    "documentation": "evals/M004.md",
+    "evidence_sha256": "e111098c00539972d264c096f5a8a0e66fc32163cfbfdd8a0215ac7e93be8ae7"
+  },
+  "presentation_acceptance": {
+    "state": "documented_acceptance",
+    "archived_state": "pending_manual_review",
+    "documentation": "evals/M004.md",
+    "evidence_sha256": "82f0762ed1a0fa375a3c830dae824cbe6632f09bad741fd83f23ca7dd1c44d52",
+    "applies_to": "runtime_original_only",
+    "publication_derivative_approval": "separate_content_approval_record"
+  }
+}

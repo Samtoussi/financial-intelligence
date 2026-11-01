@@ -1,0 +1,25 @@
+{
+  "format": "fi-publication-content-approval-v1",
+  "state": "owner_content_approved_subject_to_rights_restrictions",
+  "authority": "Project owner, by explicit instruction in this conversation; no signature or timestamp is asserted.",
+  "owner_statement": "The project owner explicitly approves the current reviewed publication derivatives for MSFT, CAT and JPM for inclusion in the public portfolio, subject to resolving any remaining rights restrictions.",
+  "scope": "Content approval of only the six public Markdown files identified below; not approval of original private reports, an independent evaluation result, legal clearance or issuer permission.",
+  "files": {
+    "cat_2026_q1/report.md": "ed80e3cd3c4fde7b4cac63b64a8ebeefe9d986bd12e75a724cb96bdb9026b799",
+    "cat_2026_q1/supporting_detail.md": "b50b1f5cdf2f256e0b75c17ad1397ece883a0609a6a32168ad6b43ed003467e9",
+    "jpm_2026_q2/report.md": "3e5674e78f519c6049a8d9c5a816fc325e181fa73cfe215a0069ca17dd0c1364",
+    "jpm_2026_q2/supporting_detail.md": "0701d98e8ad46959d3c6c0872e7722ed85794806c3eb7357c49c0560fecb1c82",
+    "msft_fy2026_q1/report.md": "dfd01e50125e397779bf2013065125cbefa6949b3055a227e13414e971c329de",
+    "msft_fy2026_q1/supporting_detail.md": "4d903382e9bba84f7aaecdd3fa04ee57a463e29e8e9741fbc43bd2a7b089afca"
+  },
+  "publication_approach": "Independently written project analysis and explanatory summaries, financial facts and deterministic calculations, limited source-derived terminology, and attribution through issuer SEC filing links. Complete filing quotation archives are excluded.",
+  "rights_review": {
+    "state": "no_specific_restriction_identified_in_reviewed_material",
+    "basis": "Focused local content and attribution review, project records and saved original MSFT, CAT and JPM filing text. No external legal assessment or current website-terms verification was performed.",
+    "limitation": "No specific applicable redistribution restriction was identified in the reviewed material. General legal uncertainty remains; absence of an identified restriction is not evidence of permission. Public SEC access alone does not establish redistribution rights.",
+    "condition": "Resolve any concrete applicable rights restriction identified before publication; this record does not authorize overriding one.",
+    "legal_clearance": false,
+    "issuer_permission_obtained": false,
+    "independent_evaluation_performed": false
+  }
+}

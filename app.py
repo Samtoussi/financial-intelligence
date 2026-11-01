@@ -2,8 +2,6 @@
 import pandas as pd
 import streamlit as st
 
-from src.ai.dashboard import DashboardContext, answer_dashboard_question
-from src.analytics.financials import get_financial_history
 from src.analytics.financial_summary import COMPANY_NAMES, format_usd
 from src.ui.analyst import analyst_loading, get_analyst_avatar, render_answer
 
@@ -53,6 +51,8 @@ st.set_page_config(page_title="Financial Intelligence", page_icon="📊", layout
 
 @st.cache_data(ttl=300)
 def load_financial_history(ticker: str) -> list[dict]:
+    from src.analytics.financials import get_financial_history
+
     return get_financial_history(ticker)
 
 
@@ -61,6 +61,8 @@ def toggle_analyst() -> None:
 
 
 def render_analyst(ticker: str, fiscal_year: int) -> None:
+    from src.ai.dashboard import DashboardContext, answer_dashboard_question
+
     with st.container(border=True, gap="xsmall"):
         with st.container(horizontal=True, vertical_alignment="center"):
             st.markdown("#### AI Analyst")
@@ -203,6 +205,13 @@ def render_dashboard(ticker: str, history: list[dict], selected: dict) -> None:
         )
         st.caption("Source: SEC CompanyFacts → dbt Gold. Revenue and growth use governed model values; growth is not recalculated here.")
 
+
+view = st.radio("View", ["Dashboard", "Quarterly Reports"], index=1, horizontal=True, key="main_view")
+if view == "Quarterly Reports":
+    from src.ui.quarterly_reports import render_quarterly_reports
+
+    render_quarterly_reports(public=True)
+    st.stop()
 
 st.session_state.setdefault("messages", [])
 st.session_state.setdefault("analyst_open", False)

@@ -1,0 +1,23 @@
+{
+  "format": "fi-quarterly-publication-v1",
+  "scope": "Verifies published-file integrity and reports saved evaluation outcomes; does not independently rerun the original source evaluation.",
+  "release_state": "content_approved_subject_to_rights_restrictions",
+  "report_ids": [
+    "msft_fy2026_q1",
+    "cat_2026_q1",
+    "jpm_2026_q2"
+  ],
+  "files": {
+    "cat_2026_q1/report.md": "ed80e3cd3c4fde7b4cac63b64a8ebeefe9d986bd12e75a724cb96bdb9026b799",
+    "cat_2026_q1/supporting_detail.md": "b50b1f5cdf2f256e0b75c17ad1397ece883a0609a6a32168ad6b43ed003467e9",
+    "cat_2026_q1/verification.json": "3eb57f03829acf4cc5bf5fcea1ad3f28c36d1f52b5ed6667daa3b1f801121da8",
+    "jpm_2026_q2/report.md": "3e5674e78f519c6049a8d9c5a816fc325e181fa73cfe215a0069ca17dd0c1364",
+    "jpm_2026_q2/supporting_detail.md": "0701d98e8ad46959d3c6c0872e7722ed85794806c3eb7357c49c0560fecb1c82",
+    "jpm_2026_q2/verification.json": "e84171b647a6eed5ac31535e7986ddb03698c7900d7a8c8db324c038d6d1b841",
+    "msft_fy2026_q1/report.md": "dfd01e50125e397779bf2013065125cbefa6949b3055a227e13414e971c329de",
+    "msft_fy2026_q1/supporting_detail.md": "4d903382e9bba84f7aaecdd3fa04ee57a463e29e8e9741fbc43bd2a7b089afca",
+    "msft_fy2026_q1/verification.json": "e08cdd60d715dbf7558fd67cd386cdfaf6efd993fb23dd8587ae8ea9e98badcb",
+    "NOTICE.md": "d26cae293238e3bf5900fd164c76ed6254b32928dc17e6c6bf5983e0dd3a8163",
+    "publication_approval.json": "c19d8ece3a5162001d8f9d0a0be15a71a490cf4c84f553f9101ca465966a4a7a"
+  }
+}

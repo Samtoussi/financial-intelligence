@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1160" viewBox="0 0 1600 1160" role="img" aria-labelledby="title desc">
+<title id="title">Financial Intelligence: implemented M006-R architecture</title>
+<desc id="desc">Three local, manually invoked workflows. CompanyFacts becomes hashed raw JSON, Parquet, persistent DuckDB and dbt Gold for annual analytics. SEC filing HTML becomes hashed snapshots, sections and chunks for lexical retrieval and an external-API-assisted analyst. Selected 10-Q snapshots feed company-specific extraction, deterministic calculations and source-grounded AI notes, independent evaluation and separate human review, private saved runs, explicitly curated public bundles and Streamlit Quarterly Reports. Annual Gold also supplies analyst tools. Quarterly figures do not come from annual Gold. Saved failures and pending review states are preserved; no arrow implies automatic approval or publication.</desc>
+<defs>
+<style>
+text{font-family:'Segoe UI',Arial,sans-serif;fill:#e5edf6}
+.title{font-size:38px;font-weight:700}.subtitle{font-size:20px;fill:#9bafc4}
+.lane{font-size:25px;font-weight:650}.kicker{font-size:14px;letter-spacing:1.8px;font-weight:700}
+.heading{font-size:23px;font-weight:650}.body{font-size:19px;fill:#bccbda}
+.small{font-size:17px;fill:#9bafc4}.edge{fill:none;stroke-width:2.5;stroke-linejoin:round}
+</style>
+<marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#69aaf8"/></marker>
+<marker id="green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#58cdb2"/></marker>
+</defs>
+<rect width="1600" height="1160" rx="18" fill="#0b1220"/>
+<text x="48" y="60" class="title">Financial Intelligence</text>
+<text x="48" y="95" class="subtitle">Implemented architecture / M006-R / local pipelines, explicit source contracts, separate review gates</text>
+
+<rect x="40" y="130" width="448" height="888" rx="18" fill="#101c2c" stroke="#69aaf8" stroke-opacity="0.45"/>
+<text x="62" y="162" class="kicker" style="fill:#69aaf8">WORKFLOW 01</text><text x="62" y="192" class="lane">Annual financial analytics</text>
+<rect x="536" y="130" width="448" height="888" rx="18" fill="#101c2c" stroke="#58cdb2" stroke-opacity="0.45"/>
+<text x="558" y="162" class="kicker" style="fill:#58cdb2">WORKFLOW 02</text><text x="558" y="192" class="lane">Filing intelligence</text>
+<rect x="1032" y="130" width="528" height="888" rx="18" fill="#101c2c" stroke="#69aaf8" stroke-opacity="0.45"/>
+<text x="1054" y="162" class="kicker" style="fill:#69aaf8">WORKFLOW 03</text><text x="1054" y="192" class="lane">Quarterly reporting</text>
+<rect x="56" y="216" width="416" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7"/>
+<rect x="56" y="233" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="74" y="247" class="heading">SEC CompanyFacts API</text>
+<text x="74" y="275" class="body">Configured MSFT, JPM and CAT</text>
+<text x="74" y="299" class="body">Structured financial observations</text>
+<path d="M264.0 316 V347" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="56" y="352" width="416" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7"/>
+<rect x="56" y="369" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="74" y="383" class="heading">Python ingestion + validation</text>
+<text x="74" y="411" class="body">Raw JSON snapshots + metadata</text>
+<text x="74" y="435" class="body">SHA-256 identity and provenance</text>
+<path d="M264.0 452 V483" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="56" y="488" width="416" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7"/>
+<rect x="56" y="505" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="74" y="519" class="heading">Normalized Parquet</text>
+<text x="74" y="547" class="body">Typed observation records</text>
+<text x="74" y="571" class="body">Validated, atomic file replacement</text>
+<path d="M264.0 588 V619" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="56" y="624" width="416" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7"/>
+<rect x="56" y="641" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="74" y="655" class="heading">Persistent DuckDB</text>
+<text x="74" y="683" class="body">Financial observations + load history</text>
+<text x="74" y="707" class="body">One active snapshot per company</text>
+<path d="M264.0 724 V755" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="56" y="760" width="416" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7"/>
+<rect x="56" y="777" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="74" y="791" class="heading">dbt Gold models + tests</text>
+<text x="74" y="819" class="body">Annual revenue + comparable YoY</text>
+<text x="74" y="843" class="body">Concept ranking and filing lineage</text>
+<path d="M264.0 860 V891" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="56" y="896" width="416" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7"/>
+<rect x="56" y="913" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="74" y="927" class="heading">Streamlit Annual Dashboard</text>
+<text x="74" y="955" class="body">Revenue history, KPIs and charts</text>
+<text x="74" y="979" class="body">Requires the local warehouse</text>
+<rect x="552" y="216" width="416" height="100" rx="11" fill="#142338" stroke="#58cdb2" stroke-opacity="0.7"/>
+<rect x="552" y="233" width="4" height="66" rx="2" fill="#58cdb2"/>
+<text x="570" y="247" class="heading">SEC submissions + Archives</text>
+<text x="570" y="275" class="body">Manually invoked filing discovery</text>
+<text x="570" y="299" class="body">10-K retrieval; selected 10-Q inputs</text>
+<path d="M760.0 316 V347" class="edge" stroke="#58cdb2" marker-end="url(#green)"/>
+<rect x="552" y="352" width="416" height="100" rx="11" fill="#142338" stroke="#58cdb2" stroke-opacity="0.7"/>
+<rect x="552" y="369" width="4" height="66" rx="2" fill="#58cdb2"/>
+<text x="570" y="383" class="heading">Raw filing HTML snapshots</text>
+<text x="570" y="411" class="body">Accession, URL and filing metadata</text>
+<text x="570" y="435" class="body">Original-byte SHA-256</text>
+<path d="M760.0 452 V483" class="edge" stroke="#58cdb2" marker-end="url(#green)"/>
+<rect x="552" y="488" width="416" height="100" rx="11" fill="#142338" stroke="#58cdb2" stroke-opacity="0.7"/>
+<rect x="552" y="505" width="4" height="66" rx="2" fill="#58cdb2"/>
+<text x="570" y="519" class="heading">Sections + Parquet chunks</text>
+<text x="570" y="547" class="body">10-K / selected 10-Q extraction</text>
+<text x="570" y="571" class="body">Hashes, stable IDs and text offsets</text>
+<path d="M760.0 588 V619" class="edge" stroke="#58cdb2" marker-end="url(#green)"/>
+<rect x="552" y="624" width="416" height="100" rx="11" fill="#142338" stroke="#58cdb2" stroke-opacity="0.7"/>
+<rect x="552" y="641" width="4" height="66" rx="2" fill="#58cdb2"/>
+<text x="570" y="655" class="heading">Lexical evidence retrieval</text>
+<text x="570" y="683" class="body">In-memory DuckDB Parquet reader</text>
+<text x="570" y="707" class="body">Python ranking + filing metadata</text>
+<path d="M760.0 724 V755" class="edge" stroke="#58cdb2" marker-end="url(#green)"/>
+<rect x="552" y="760" width="416" height="100" rx="11" fill="#142338" stroke="#58cdb2" stroke-opacity="0.7"/>
+<rect x="552" y="777" width="4" height="66" rx="2" fill="#58cdb2"/>
+<text x="570" y="791" class="heading">AI Analyst + financial tools</text>
+<text x="570" y="819" class="body">Gold metrics + retrieved passages</text>
+<text x="570" y="843" class="body">External Responses API inference</text>
+<path d="M760.0 860 V891" class="edge" stroke="#58cdb2" marker-end="url(#green)"/>
+<rect x="552" y="896" width="416" height="100" rx="11" fill="#142338" stroke="#58cdb2" stroke-opacity="0.7"/>
+<rect x="552" y="913" width="4" height="66" rx="2" fill="#58cdb2"/>
+<text x="570" y="927" class="heading">Streamlit Analyst Workspace</text>
+<text x="570" y="955" class="body">Citations and evidence coverage</text>
+<text x="570" y="979" class="body">Explicit missing-evidence notices</text>
+<rect x="1048" y="216" width="496" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7"/>
+<rect x="1048" y="233" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="1066" y="247" class="heading">Company-specific 10-Q contracts</text>
+<text x="1066" y="275" class="body">Pinned MSFT / CAT / JPM source windows</text>
+<text x="1066" y="299" class="body">Explicit periods, units and accounting scopes</text>
+<path d="M1296.0 316 V347" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="1048" y="352" width="496" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7"/>
+<rect x="1048" y="369" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="1066" y="383" class="heading">Financial assembly + interpretation</text>
+<text x="1066" y="411" class="body">Python: values, changes and reconciliation</text>
+<text x="1066" y="435" class="body">AI: source-bound notes via external API</text>
+<path d="M1296.0 452 V483" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="1048" y="488" width="496" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7"/>
+<rect x="1048" y="505" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="1066" y="519" class="heading">Independent evaluation + human review</text>
+<text x="1066" y="547" class="body">Oracle, source, financial and narrative checks</text>
+<text x="1066" y="571" class="body">Separate semantic / presentation acceptance</text>
+<path d="M1296.0 588 V619" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="1048" y="624" width="496" height="100" rx="11" fill="#142338" stroke="#69aaf8" stroke-opacity="0.7" stroke-dasharray="7 5"/>
+<rect x="1048" y="641" width="4" height="66" rx="2" fill="#69aaf8"/>
+<text x="1066" y="655" class="heading">Saved runs + investor presentations</text>
+<text x="1066" y="683" class="body">Local evidence, raw responses and reviews</text>
+<text x="1066" y="707" class="body">Historical failures and pending states retained</text>
+<path d="M1296.0 724 V755" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="1048" y="760" width="496" height="100" rx="11" fill="#142338" stroke="#58cdb2" stroke-opacity="0.7"/>
+<rect x="1048" y="777" width="4" height="66" rx="2" fill="#58cdb2"/>
+<text x="1066" y="791" class="heading">Curated portable public showcase</text>
+<text x="1066" y="819" class="body">Markdown + verification metadata + checksums</text>
+<text x="1066" y="843" class="body">Owner content approval; rights condition retained</text>
+<path d="M1296.0 860 V891" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<rect x="1048" y="896" width="496" height="100" rx="11" fill="#142338" stroke="#58cdb2" stroke-opacity="0.7"/>
+<rect x="1048" y="913" width="4" height="66" rx="2" fill="#58cdb2"/>
+<text x="1066" y="927" class="heading">Streamlit Quarterly Reports</text>
+<text x="1066" y="955" class="body">Pinned manifest + file / metadata validation</text>
+<text x="1066" y="979" class="body">Offline after install; no private-source replay</text>
+<path d="M472 810 H547" class="edge" stroke="#69aaf8" marker-end="url(#blue)"/>
+<path d="M968 402 H1007 V266 H1043" class="edge" stroke="#58cdb2" marker-end="url(#green)"/>
+<text x="48" y="1054" class="small">Annual Gold supplies the dashboard and analyst tools. Quarterly financial values are extracted from filing tables.</text>
+<text x="48" y="1085" class="small">Oracle fixtures are evaluation-only. Saved history includes failures. Human acceptance and public-derivative approval are distinct.</text>
+<rect x="48" y="1111" width="10" height="10" rx="2" fill="#69aaf8"/><text x="68" y="1122" class="small">Structured / report processing</text>
+<rect x="420" y="1111" width="10" height="10" rx="2" fill="#58cdb2"/><text x="440" y="1122" class="small">Filing evidence / public presentation</text>
+<text x="1060" y="1122" class="small">No scheduler, cloud deployment or automatic publication</text>
+</svg>

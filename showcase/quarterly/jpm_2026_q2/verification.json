@@ -1,0 +1,93 @@
+{
+  "format": "fi-public-verification-v1",
+  "report_id": "jpm_2026_q2",
+  "identity": {
+    "ticker": "JPM",
+    "form": "10-Q",
+    "accession": "0001628280-26-054343",
+    "fiscal_period": "FY2026 Q2",
+    "report_date": "2026-06-30"
+  },
+  "sources": [
+    {
+      "label": "Income statement, page 93",
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm"
+    },
+    {
+      "label": "Balance sheet, page 95",
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm"
+    },
+    {
+      "label": "Reported and managed basis, page 18",
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm"
+    },
+    {
+      "label": "Financial highlights, page 3",
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm"
+    },
+    {
+      "label": "Quarterly credit-loss context, page 12",
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm"
+    },
+    {
+      "label": "Allowance scopes and footnote (b), page 76",
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm"
+    },
+    {
+      "label": "Significant earnings items, page 5",
+      "url": "https://www.sec.gov/Archives/edgar/data/19617/000162828026054343/jpm-20260630.htm"
+    }
+  ],
+  "derivation": {
+    "original_report_sha256": "e46dbd5fabc3a314dc9f1418fdd1e6e18580cca4b6f41c400144eb7133bfe3af",
+    "original_supporting_detail_sha256": "ab6b6ab3a5772f6ebf8d7f904775be75afde745e10da6419a0020f615957088c",
+    "changes": [
+      "Publication notice and public-detail link label added to report.",
+      "Supporting detail reduced to verified financial tables and SEC links; extensive source excerpts and interpretation archives omitted.",
+      "Added the Dated firmwide allowance stock table: USD 31,531 million at June 30, 2026 and USD 31,230 million at December 31, 2025. These existing verified values are transcribed from the Allowances for credit losses row in Consolidated financial highlights (page 3) of Form 10-Q, accession 0001628280-26-054343, preserved in the original supporting detail's Financial highlights, page 3 source quotation; see the existing Financial highlights, page 3 SEC source link. No values were recalculated.",
+      "Following focused content and attribution review, reworded Significant earnings items to distinguish the Visa net gain in Corporate from equity-investment gains in Corporate and CIB; verified amounts, existing S7/S1 citations and recurring-performance commentary are preserved. This publication edit is not covered by original presentation acceptance."
+    ],
+    "private_lineage": "Validated during curation using the strict local loader; private inputs are not included or rechecked by the public loader."
+  },
+  "saved_evaluation": {
+    "financial": {
+      "version": "m006-financial-eval-v1",
+      "automatic_pass": true,
+      "counters": {
+        "financial_values": {
+          "passed": 16,
+          "total": 16
+        },
+        "yoy_changes": {
+          "passed": 6,
+          "total": 6
+        },
+        "table_evidence_support": {
+          "passed": 8,
+          "total": 8
+        }
+      },
+      "evidence_sha256": "73df1cef2e697d335a411beb95d33b3eef6f33c8b5610069731fe8c13cb607a2"
+    },
+    "presentation": {
+      "version": "m006-ai-presentation-v1",
+      "automatic_pass": true,
+      "archived_overall_pass": false,
+      "evidence_sha256": "47dda87f351d0b7f53a515568f8467e282f5d574c8aa192bdac0a44e721875fe"
+    }
+  },
+  "semantic_review": {
+    "state": "documented_acceptance",
+    "archived_state": "pending_manual_review",
+    "documentation": "evals/M006.md",
+    "evidence_sha256": "e5a421d83676cb51caf7bff987bfa2517de3ff101b5a0b759a9a78ea1fb6d06e"
+  },
+  "presentation_acceptance": {
+    "state": "documented_acceptance",
+    "archived_state": "pending_manual_review",
+    "documentation": "evals/M006.md",
+    "evidence_sha256": "911ff375392286cf8bccc970ec0b2e01cfabdf7fa602af4a2386b10bd36600f0",
+    "applies_to": "runtime_original_only",
+    "publication_derivative_approval": "separate_content_approval_record"
+  }
+}

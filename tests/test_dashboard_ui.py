@@ -52,7 +52,9 @@ def dashboard(request, branding):
             rows[-1]["revenue_usd"] = 90_000_000_000
     st.cache_data.clear()
     with patch("src.analytics.financials.get_financial_history", return_value=rows):
-        app = AppTest.from_file("../app.py", default_timeout=15).run()
+        app = AppTest.from_file("../app.py", default_timeout=15)
+        app.session_state["main_view"] = "Dashboard"
+        app.run()
         yield app
 
 

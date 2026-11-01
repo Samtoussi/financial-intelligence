@@ -1,0 +1,17 @@
+# Quarterly publication candidates
+
+These three curated snapshots are publication derivatives of saved Financial Intelligence presentations.
+
+Verifies published-file integrity and reports saved evaluation outcomes; does not independently rerun the original source evaluation.
+
+The original runtime reports, source evidence, private lineage, prompts and API records remain unchanged and excluded. Original-record hashes in verification metadata are provenance references, not proof that omitted inputs were rechecked in this public package. File hashes detect changes relative to the reviewed release catalog; they are not digital signatures or independent assurance.
+
+Saved automatic evaluation, semantic review and human presentation acceptance are separate. MSFT presentation acceptance is documented in M004. CAT has hash-bound acceptance for its original report, not these publication derivatives. JPM acceptance is documented in M006 while its archived review records remain pending. No final hash-bound original presentation approval is asserted for MSFT or JPM. A new, separate owner content approval for the six current public Markdown files is recorded with their exact SHA-256 hashes in [publication_approval.json](publication_approval.json). It applies only to these publication derivatives and is conditional on resolving any remaining rights restrictions. It does not approve the original private reports or constitute independent evaluation, legal clearance or issuer permission. Embedded pending-release labels predate this separate content approval; this record and the current status display provide the subsequent approval context.
+
+The publication approach combines independently written project analysis and explanatory summaries, financial facts and deterministic calculations, limited source-derived terminology, and SEC attribution. Financial tables and concise accounting-context summaries are retained. Extensive filing quotations are omitted from public supporting detail. Issuer disclosures are attributed through SEC filing links; no issuer endorsement or public-domain status is claimed.
+
+A focused content and attribution review was completed against saved original reports and available filing evidence. The three recommended editorial improvements were applied to the public reports: MSFT's cloud-growth and margin explanation was independently worded; CAT's sales-volume and pricing explanation was shortened; and JPM's separate Visa and equity-investment gains were clarified, including the Visa gain's Corporate attribution. Verified financial facts and existing SEC citations are preserved. This review does not establish legal clearance or redistribution permission, and no new license is asserted.
+
+No specific applicable redistribution restriction was identified in the reviewed local material. This is a bounded finding, not a legal opinion or evidence of permission; current website terms and external rights advice were not verified. Public SEC access alone does not establish redistribution rights. General legal uncertainty remains distinct from an identified restriction. The owner's content approval does not authorize overriding any concrete applicable restriction subsequently identified. No concrete rights blocker is currently identified by this review.
+
+The Streamlit view operates offline after dependencies are installed. Following external SEC or repository links requires internet access. The optional annual dashboard still requires local warehouse data.

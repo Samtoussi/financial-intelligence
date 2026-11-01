@@ -1,0 +1,81 @@
+{
+  "format": "fi-public-verification-v1",
+  "report_id": "cat_2026_q1",
+  "identity": {
+    "ticker": "CAT",
+    "form": "10-Q",
+    "accession": "0000018230-26-000021",
+    "fiscal_period": "FY2026 Q1",
+    "period_start": "2026-01-01",
+    "period_end": "2026-03-31"
+  },
+  "sources": [
+    {
+      "label": "Income statements · Part I, Item 1",
+      "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm"
+    },
+    {
+      "label": "Segment disclosures · Part I, Item 1",
+      "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm"
+    },
+    {
+      "label": "Segment reporting basis · Part I, Item 1",
+      "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm"
+    },
+    {
+      "label": "Management discussion · Part I, Item 2",
+      "url": "https://www.sec.gov/Archives/edgar/data/18230/000001823026000021/cat-20260331.htm"
+    }
+  ],
+  "derivation": {
+    "original_report_sha256": "d81419faf7ffa0daa4a1675606ae0545223bfcb540b54a071483a4466ac2d08a",
+    "original_supporting_detail_sha256": "dc04a29b1f196db07bca95c87f9d7e829346f8ee64a7e944586bc66fe4af3674",
+    "changes": [
+      "Publication notice and public-detail link label added to report.",
+      "Supporting detail reduced to verified financial tables, concise accounting-context explanations and SEC links; extensive source excerpts and interpretation archives omitted.",
+      "Following focused content and attribution review, shortened the Sales volume and pricing takeaway, preserving the verified total increase, revenue total, volume and pricing contributions and existing S4 citation. Original hash-bound approval remains limited to the runtime original."
+    ],
+    "private_lineage": "Validated during curation using the strict local loader; private inputs are not included or rechecked by the public loader."
+  },
+  "saved_evaluation": {
+    "financial": {
+      "version": "m005-eval-v3",
+      "automatic_pass": true,
+      "counters": {
+        "financial_values": {
+          "passed": 16,
+          "total": 16
+        },
+        "yoy_changes": {
+          "passed": 8,
+          "total": 8
+        },
+        "table_evidence_support": {
+          "passed": 8,
+          "total": 8
+        }
+      },
+      "evidence_sha256": "42ffa0844516e41e9210c12764d227c76a284de8bfe12d7c7b6f9472a712ccaf"
+    },
+    "presentation": {
+      "version": "m005-presentation-eval-v1",
+      "automatic_pass": true,
+      "archived_overall_pass": false,
+      "evidence_sha256": "18c4f6d1881a6eb1d4a85b35406601538bfc457f429c4dc23087e0697b0c245f"
+    }
+  },
+  "semantic_review": {
+    "state": "passed_saved_reviews",
+    "archived_state": "pending_manual_review",
+    "documentation": "evals/M005_FINAL_VERIFICATION.md",
+    "evidence_sha256": "dd3151607d0374d62d613b67e94ad9d5475a3f8cc71bd2d6898bb14e542df53f"
+  },
+  "presentation_acceptance": {
+    "state": "original_hash_bound_approval",
+    "archived_state": "pending_manual_review",
+    "documentation": "evals/M005_FINAL_VERIFICATION.md",
+    "evidence_sha256": "10d2f12678169571007621b805d4ea5a0612af3624dc0669aac468cd9795ce60",
+    "applies_to": "runtime_original_only",
+    "publication_derivative_approval": "separate_content_approval_record"
+  }
+}
