@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -121,7 +122,10 @@ def save_snapshot(
     output_dir = RAW_DIR / ticker
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    filename = f"{timestamp}_{digest[:12]}"
+    # The timestamp preserves chronological filename ordering.
+    # A random suffix prevents repeated saves in the same second
+    # from targeting the same snapshot files.
+    filename = f"{timestamp}_{digest[:12]}_{uuid.uuid4().hex[:12]}"
     json_path = output_dir / f"{filename}.json"
     metadata_path = output_dir / f"{filename}.metadata.json"
 
@@ -136,9 +140,10 @@ def save_snapshot(
         **summary,
     }
 
-    # Write temporary files before publishing the snapshot.
     temp_json = json_path.with_suffix(".json.tmp")
     temp_metadata = metadata_path.with_suffix(".json.tmp")
+
+    published_json = False
 
     try:
         temp_json.write_bytes(payload)
@@ -147,8 +152,24 @@ def save_snapshot(
             encoding="utf-8",
         )
 
+        # Reject a pre-existing destination rather than
+        # intentionally replacing historical artifacts.
+        if json_path.exists() or metadata_path.exists():
+            raise FileExistsError(
+                f"Snapshot destination already exists: {filename}"
+            )
+
         os.replace(temp_json, json_path)
+        published_json = True
+
         os.replace(temp_metadata, metadata_path)
+
+    except Exception:
+        # Only remove a payload published by this invocation.
+        if published_json:
+            json_path.unlink(missing_ok=True)
+        raise
+
     finally:
         temp_json.unlink(missing_ok=True)
         temp_metadata.unlink(missing_ok=True)
