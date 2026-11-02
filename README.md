@@ -105,6 +105,8 @@ The warehouse deliberately holds one active snapshot per company:
 
 Raw snapshots and load metadata preserve history around that active-data policy. The warehouse is not a collection of every downloaded payload merged together.
 
+A saved CompanyFacts snapshot can be replayed offline using `python -m src.transformation.load_companyfacts MSFT --snapshot <path>`. Snapshot metadata and SHA-256 are verified before loading. Use an isolated warehouse when replaying historical data.
+
 ### 3. Build governed annual metrics with dbt
 
 [annual_revenue.sql](dbt/models/gold/annual_revenue.sql) filters annual USD observations and ranks revenue concepts separately by company. It selects one observation per company/year-end, using filing recency and deterministic tie-breaks, and exposes the source concept and filing metadata.
@@ -116,7 +118,7 @@ The resulting tables are:
 - `main_gold.annual_revenue`
 - `main_gold.annual_revenue_growth`
 
-Both live in `data/warehouse/financial_intelligence.duckdb`. The Streamlit annual dashboard reads these models; it does not reconstruct financial calculations in the presentation layer.
+By default, both live in `data/warehouse/financial_intelligence.duckdb`. Set `FI_DUCKDB_PATH` to use an isolated warehouse for offline recovery or replay. The Streamlit annual dashboard reads these models; it does not reconstruct financial calculations in the presentation layer.
 
 ### 4. Preserve filing evidence for retrieval
 
