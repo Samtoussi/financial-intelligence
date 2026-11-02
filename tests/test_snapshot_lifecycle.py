@@ -1,3 +1,4 @@
+
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -198,6 +199,46 @@ class TestSnapshotLifecycle(unittest.TestCase):
         self.assertEqual(
             self.query("SELECT COUNT(*) FROM loaded_snapshots"),
             [(1,)],
+        )
+
+    def test_failed_insert_after_delete_rolls_back(self):
+        original_path = self.create_parquet(
+            "original.parquet", 789019, "snapshot-a", [100]
+        )
+        invalid_path = self.create_parquet(
+            "invalid.parquet", 789019, "snapshot-b", [200]
+        )
+
+        self.load(original_path, "snapshot-a", 1, 789019, OLD_TIME)
+
+        # Keep Parquet structurally valid, but corrupt the JSON
+        # that DuckDB casts during INSERT.
+        table = pq.read_table(invalid_path)
+        rows = table.to_pylist()
+        rows[0]["raw_observation"] = "{invalid json"
+
+        pq.write_table(pa.Table.from_pylist(rows), invalid_path)
+
+        # Validation succeeds, DELETE executes, then INSERT fails.
+        with self.assertRaises(duckdb.Error):
+            self.load(invalid_path, "snapshot-b", 1, 789019, NEW_TIME)
+
+        # The original observation must survive the rollback.
+        self.assertEqual(
+            self.query("""
+                SELECT snapshot_id, value
+                FROM financial_observations
+            """),
+            [("snapshot-a", 100.0)],
+        )
+
+        # No metadata record should exist for the failed snapshot.
+        self.assertEqual(
+            self.query("""
+                SELECT snapshot_id
+                FROM loaded_snapshots
+            """),
+            [("snapshot-a",)],
         )
 
     def test_rejects_empty_snapshot(self):
