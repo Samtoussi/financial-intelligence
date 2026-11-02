@@ -1,7 +1,8 @@
+
 financial_intelligence:
   target: dev
   outputs:
     dev:
       type: duckdb
-      path: data/warehouse/financial_intelligence.duckdb
+      path: "{{ env_var('FI_DUCKDB_PATH', 'data/warehouse/financial_intelligence.duckdb') }}"
       threads: 2

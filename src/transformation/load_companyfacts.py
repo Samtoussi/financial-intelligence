@@ -15,7 +15,12 @@ import pyarrow.parquet as pq
 
 RAW_DIR = Path("data/raw/sec/companyfacts")
 PARQUET_DIR = Path("data/processed/companyfacts")
-DB_PATH = Path("data/warehouse/financial_intelligence.duckdb")
+DB_PATH = Path(
+    os.environ.get(
+        "FI_DUCKDB_PATH",
+        "data/warehouse/financial_intelligence.duckdb",
+    )
+)
 
 COMPANIES = {
     "MSFT": 789019,
@@ -450,11 +455,36 @@ def inspect_microsoft(snapshot_id):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("ticker", choices=sorted(COMPANIES))
+    parser.add_argument(
+        "--snapshot",
+        type=Path,
+        help="Replay a specific saved CompanyFacts JSON snapshot",
+    )
     args = parser.parse_args()
 
     start = time.perf_counter()
 
-    snapshot = latest_snapshot(args.ticker)
+    if args.snapshot is not None:
+        snapshot = args.snapshot.resolve()
+
+        expected_dir = (RAW_DIR / args.ticker).resolve()
+
+        if snapshot.parent != expected_dir:
+            parser.error(
+                "--snapshot must be inside the selected ticker's "
+                "raw snapshot directory"
+            )
+
+        if (
+            snapshot.suffix != ".json"
+            or snapshot.name.endswith(".metadata.json")
+        ):
+            parser.error("--snapshot must point to a raw JSON snapshot")
+
+        if not snapshot.is_file():
+            parser.error(f"Snapshot not found: {snapshot}")
+    else:
+        snapshot = latest_snapshot(args.ticker)
     payload = snapshot.read_bytes()
     data = json.loads(payload)
 
