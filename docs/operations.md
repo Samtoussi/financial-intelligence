@@ -296,6 +296,7 @@ They verify the public package and route isolation, not fresh SEC evaluation.
 M009 verification baseline: 1,180 tests passed, 4 skipped, 14 parser warnings, November 2026.
 
 This is the preserved milestone baseline, not current release-candidate evidence.
-The current release checkpoint is handled separately in M012-C.
+See [release validation evidence](release-validation.md) for the M011 review,
+the reported local checkpoint, revision correspondence and remote CI limitations.
 
 The parser warnings are related to XML documents processed using an HTML parser and are tracked separately from operational reliability.

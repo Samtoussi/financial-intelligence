@@ -316,6 +316,8 @@ For credential-free public-showcase checks without warehouse preparation: `pytho
 
 **Recorded local verification:** 1,111 Python tests passed with 14 parser warnings; the focused public/private report suites passed 163 tests. These are historical local results, not a new dependency-install test or a statistical reliability estimate for live generation.
 
+[Release validation evidence](docs/release-validation.md) records the M011 Microsoft replay and owner approval, the later reported local checkpoint (1,201 passed, 4 skipped, 14 warnings), revision correspondence and the unverified remote CI status. These are separate from the historical counts above.
+
 dbt defines 16 data tests covering required fields, uniqueness, valid annual observations, growth calculations and comparability.
 
 ### What the tests establish
