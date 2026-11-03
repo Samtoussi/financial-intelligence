@@ -1,11 +1,8 @@
 
-from pathlib import Path
-
 import duckdb
 
+from src.warehouse import get_duckdb_path
 
-ROOT = Path(__file__).resolve().parents[2]
-DB_PATH = ROOT / "data" / "warehouse" / "financial_intelligence.duckdb"
 
 COMPANIES = {
     "MSFT": 789019,
@@ -15,10 +12,11 @@ COMPANIES = {
 
 
 def _get_connection():
-    if not DB_PATH.is_file():
-        raise FileNotFoundError(f"DuckDB database not found: {DB_PATH}")
+    db_path = get_duckdb_path()
+    if not db_path.is_file():
+        raise FileNotFoundError(f"DuckDB database not found: {db_path}")
 
-    return duckdb.connect(str(DB_PATH), read_only=True)
+    return duckdb.connect(str(db_path), read_only=True)
 
 
 def _row_to_financial(row: tuple, ticker: str) -> dict:

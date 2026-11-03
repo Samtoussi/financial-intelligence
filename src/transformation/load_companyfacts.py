@@ -12,15 +12,11 @@ import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from src.warehouse import get_duckdb_path
+
 
 RAW_DIR = Path("data/raw/sec/companyfacts")
 PARQUET_DIR = Path("data/processed/companyfacts")
-DB_PATH = Path(
-    os.environ.get(
-        "FI_DUCKDB_PATH",
-        "data/warehouse/financial_intelligence.duckdb",
-    )
-)
 
 COMPANIES = {
     "MSFT": 789019,
@@ -298,9 +294,10 @@ def load_duckdb(
 
     retrieved_at_utc = retrieved_at_utc.astimezone(timezone.utc)
 
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db_path = get_duckdb_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    con = duckdb.connect(str(DB_PATH))
+    con = duckdb.connect(str(db_path))
     transaction_started = False
 
     try:
@@ -428,7 +425,7 @@ def load_duckdb(
 
 
 def inspect_microsoft(snapshot_id):
-    con = duckdb.connect(str(DB_PATH), read_only=True)
+    con = duckdb.connect(str(get_duckdb_path()), read_only=True)
 
     try:
         return con.execute(

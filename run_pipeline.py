@@ -18,13 +18,13 @@ from src.ingestion.companyfacts import (
 from src.operations.dbt_results import summarize_dbt_results
 from src.operations.run_tracking import RunTracker
 from src.transformation.load_companyfacts import (
-    DB_PATH,
     active_snapshot,
     load_duckdb,
     normalize,
     read_snapshot_metadata,
     write_parquet,
 )
+from src.warehouse import get_duckdb_path
 
 
 ROOT = Path(__file__).resolve().parent
@@ -32,7 +32,7 @@ ROOT = Path(__file__).resolve().parent
 
 def get_active_snapshot(cik):
     """Return the warehouse's active snapshot, or None if uninitialized."""
-    db_path = Path(DB_PATH)
+    db_path = get_duckdb_path()
 
     if not db_path.exists():
         return None
@@ -169,16 +169,7 @@ def run_pipeline():
 
         dbt_target = tracker.run_dir / "dbt"
 
-        warehouse_path = Path(
-            os.environ.get(
-                "FI_DUCKDB_PATH",
-                "data/warehouse/financial_intelligence.duckdb",
-            )
-        )
-        if not warehouse_path.is_absolute():
-            warehouse_path = ROOT / warehouse_path
-
-        warehouse_path = warehouse_path.resolve()
+        warehouse_path = get_duckdb_path()
 
         try:
             subprocess.run(

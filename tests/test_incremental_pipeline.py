@@ -10,7 +10,7 @@ import run_pipeline
 def test_get_active_snapshot_returns_none_when_db_missing(tmp_path):
     db_path = tmp_path / "missing.duckdb"
 
-    with patch.object(run_pipeline, "DB_PATH", db_path):
+    with patch.dict("os.environ", {"FI_DUCKDB_PATH": str(db_path)}):
         assert run_pipeline.get_active_snapshot(789019) is None
 
     assert not db_path.exists()
@@ -22,7 +22,7 @@ def test_get_active_snapshot_returns_none_when_table_missing(tmp_path):
     con = duckdb.connect(str(db_path))
     con.close()
 
-    with patch.object(run_pipeline, "DB_PATH", db_path):
+    with patch.dict("os.environ", {"FI_DUCKDB_PATH": str(db_path)}):
         assert run_pipeline.get_active_snapshot(789019) is None
 
 
@@ -46,7 +46,7 @@ def test_get_active_snapshot_reads_existing_snapshot(tmp_path):
     )
     con.close()
 
-    with patch.object(run_pipeline, "DB_PATH", db_path):
+    with patch.dict("os.environ", {"FI_DUCKDB_PATH": str(db_path)}):
         assert run_pipeline.get_active_snapshot(789019) == "snapshot-abc"
 
 
@@ -72,7 +72,7 @@ def test_get_active_snapshot_rejects_multiple_active_snapshots(tmp_path):
     )
     con.close()
 
-    with patch.object(run_pipeline, "DB_PATH", db_path):
+    with patch.dict("os.environ", {"FI_DUCKDB_PATH": str(db_path)}):
         with pytest.raises(RuntimeError, match="multiple active snapshots"):
             run_pipeline.get_active_snapshot(789019)
 
@@ -81,7 +81,7 @@ def test_get_active_snapshot_propagates_database_errors(tmp_path):
     db_path = tmp_path / "invalid.duckdb"
     db_path.write_text("not a valid DuckDB database")
 
-    with patch.object(run_pipeline, "DB_PATH", db_path):
+    with patch.dict("os.environ", {"FI_DUCKDB_PATH": str(db_path)}):
         with pytest.raises(duckdb.Error):
             run_pipeline.get_active_snapshot(789019)
 

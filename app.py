@@ -50,7 +50,8 @@ st.set_page_config(page_title="Financial Intelligence", page_icon="📊", layout
 
 
 @st.cache_data(ttl=300)
-def load_financial_history(ticker: str) -> list[dict]:
+def load_financial_history(ticker: str, warehouse_path: str) -> list[dict]:
+    """Include the runtime warehouse path in Streamlit's cache key."""
     from src.analytics.financials import get_financial_history
 
     return get_financial_history(ticker)
@@ -213,6 +214,8 @@ if view == "Quarterly Reports":
     render_quarterly_reports(public=True)
     st.stop()
 
+from src.warehouse import get_duckdb_path
+
 st.session_state.setdefault("messages", [])
 st.session_state.setdefault("analyst_open", False)
 
@@ -225,7 +228,7 @@ with st.container(horizontal=True, vertical_alignment="bottom", gap="small"):
         format_func=lambda value: f"{COMPANY_NAMES[value]} ({value})",
     )
     try:
-        history = load_financial_history(ticker)
+        history = load_financial_history(ticker, str(get_duckdb_path()))
     except (FileNotFoundError, RuntimeError) as exc:
         st.error(f"Could not load financial data: {exc}")
         st.stop()

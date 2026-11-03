@@ -24,11 +24,7 @@ class TestSnapshotLifecycle(unittest.TestCase):
 
         self.db_path = Path(self.temp_dir.name) / "test.duckdb"
 
-        self.db_patch = patch.object(
-            load_companyfacts,
-            "DB_PATH",
-            self.db_path,
-        )
+        self.db_patch = patch.dict("os.environ", {"FI_DUCKDB_PATH": str(self.db_path)})
         self.db_patch.start()
         self.addCleanup(self.db_patch.stop)
 

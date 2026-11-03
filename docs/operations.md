@@ -44,6 +44,13 @@ The Gold stage records:
 
 The warehouse path defaults to `data/warehouse/financial_intelligence.duckdb` and can be overridden using `FI_DUCKDB_PATH`.
 
+Python ingestion, analytics and AI financial tools read this variable at runtime,
+and dashboard cache entries include the resolved warehouse path. Relative overrides
+are resolved against the process working directory; run pipeline and dbt commands
+from the repository root, or use an absolute path. dbt reads the environment on
+each invocation. Changing the variable selects a warehouse; it does not populate
+it or migrate data. Restart a separate running app process to change its environment.
+
 A failed dbt execution may still produce `run_results.json`. When available and valid, its diagnostic summary is recorded in the failed Gold stage.
 If the result artifact is missing or invalid, the run records that condition instead.
 
