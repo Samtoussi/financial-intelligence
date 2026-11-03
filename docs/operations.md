@@ -45,8 +45,44 @@ The Gold stage records:
 The warehouse path defaults to `data/warehouse/financial_intelligence.duckdb` and can be overridden using `FI_DUCKDB_PATH`.
 
 A failed dbt execution may still produce `run_results.json`. When available and valid, its diagnostic summary is recorded in the failed Gold stage.
-
 If the result artifact is missing or invalid, the run records that condition instead.
+
+## Incremental Processing & Snapshot History
+
+CompanyFacts uses content-addressed snapshots identified by the SHA-256 hash of the original SEC response.
+
+Each pipeline execution retrieves and stores a Bronze snapshot. Before Silver processing, the incoming snapshot ID is compared with the company's active snapshot in DuckDB.
+
+- Unchanged snapshots skip Silver normalization, Parquet writing and warehouse loading.
+- Changed snapshots are normalized into a complete Silver Parquet dataset.
+- DuckDB replaces the selected company's observations within a transaction.
+- Other companies' observations remain unaffected.
+- Gold models are rebuilt on each successful pipeline execution.
+
+Snapshot history is preserved in Bronze, while Silver Parquet files are addressed by snapshot hash. The warehouse contains the active observations for each company rather than all historical versions.
+
+Historical snapshots can be compared using:
+
+```powershell
+.\.venv\Scripts\python.exe -m src.transformation.snapshot_report JPM
+```
+
+The report compares the two most recent distinct snapshots with available Silver Parquet files and summarizes added, removed, changed and ambiguous observations.
+
+### Incremental Loading Design Decision
+
+Row-level incremental updates using MERGE or UPSERT were evaluated but are not implemented.
+
+The current warehouse is approximately 17.76 MB and contains roughly 127,000 active CompanyFacts observations across three companies.
+
+Full replacement per company was retained because:
+
+- DuckDB handles the current dataset size without an observed performance bottleneck.
+- Transactional replacement provides a straightforward recovery and consistency model.
+- Every active observation belongs to one identifiable snapshot.
+- Row-level updates would require additional identity, lineage and deletion-handling complexity.
+
+Row-level incremental loading may be reconsidered if future data volume or measured loading performance justifies it.
 
 ## Failure Investigation
 
@@ -91,6 +127,6 @@ Run the complete test suite from the repository root:
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-M008 verification baseline: 1,159 tests passed, 14 parser warnings, November 2026.
+M009 verification baseline: 1,180 tests passed, 4 skipped, 14 parser warnings, November 2026.
 
 The parser warnings are related to XML documents processed using an HTML parser and are tracked separately from operational reliability.
