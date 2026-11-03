@@ -7,6 +7,8 @@ import sys
 import time
 from pathlib import Path
 
+import duckdb
+
 from src.ingestion.companyfacts import (
     COMPANIES,
     fetch_companyfacts,
@@ -16,6 +18,8 @@ from src.ingestion.companyfacts import (
 from src.operations.dbt_results import summarize_dbt_results
 from src.operations.run_tracking import RunTracker
 from src.transformation.load_companyfacts import (
+    DB_PATH,
+    active_snapshot,
     load_duckdb,
     normalize,
     read_snapshot_metadata,
@@ -24,6 +28,33 @@ from src.transformation.load_companyfacts import (
 
 
 ROOT = Path(__file__).resolve().parent
+
+
+def get_active_snapshot(cik):
+    """Return the warehouse's active snapshot, or None if uninitialized."""
+    db_path = Path(DB_PATH)
+
+    if not db_path.exists():
+        return None
+
+    con = duckdb.connect(str(db_path), read_only=True)
+
+    try:
+        table_exists = con.execute(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'main'
+              AND table_name = 'financial_observations'
+            """
+        ).fetchone()[0]
+
+        if not table_exists:
+            return None
+
+        return active_snapshot(con, cik)
+    finally:
+        con.close()
 
 
 def run_pipeline():
@@ -73,8 +104,25 @@ def run_pipeline():
                 "observations": summary["observations"],
             })
 
-            # Silver: raw JSON -> Parquet -> DuckDB
+            # Silver: skip when warehouse already has this snapshot
             tracker.start_stage("silver", ticker)
+
+            current_snapshot = get_active_snapshot(cik)
+
+            if current_snapshot == snapshot_id:
+                print(
+                    "\n[SILVER] SKIPPED: "
+                    "Snapshot already active in warehouse."
+                )
+                print(f"SHA-256: {snapshot_id}")
+
+                tracker.complete_stage({
+                    "skipped": True,
+                    "reason": "unchanged_snapshot",
+                    "snapshot_sha256": snapshot_id,
+                })
+                continue
+
             print("\n[SILVER] Normalizing and loading...")
 
             data = json.loads(payload)
@@ -105,6 +153,7 @@ def run_pipeline():
             print(f"DuckDB rows: {loaded:,}")
 
             tracker.complete_stage({
+                "skipped": False,
                 "parquet_path": str(parquet_path),
                 "snapshot_sha256": snapshot_id,
                 "normalized_rows": len(rows),
@@ -147,7 +196,6 @@ def run_pipeline():
                 cwd=ROOT,
             )
         except subprocess.CalledProcessError:
-            # dbt can produce run_results.json even when build fails.
             if (dbt_target / "run_results.json").is_file():
                 try:
                     gold_diagnostics = summarize_dbt_results(dbt_target)
@@ -179,7 +227,6 @@ def run_pipeline():
         tracker.complete()
 
     except Exception as exc:
-        # Preserve the original exception if tracking also fails.
         try:
             if tracker.manifest["status"] == "running":
                 tracker.fail(exc, artifacts=gold_diagnostics)
