@@ -7,6 +7,7 @@ import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 import requests
 
@@ -86,6 +87,7 @@ def discover_filing(
     raise ValueError(f"No recent {form} found for CIK {cik}, accession={accession}")
 
 
+
 def save_snapshot(ticker: str, payload: bytes, filing: dict) -> Path:
     if not payload.strip():
         raise ValueError("Empty filing document")
@@ -97,7 +99,10 @@ def save_snapshot(ticker: str, payload: bytes, filing: dict) -> Path:
     output_dir = RAW_DIR / ticker / filing["accession"]
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    filename = f"{timestamp}_{digest[:12]}"
+    # Preserve chronological ordering while preventing collisions
+    # between identical snapshots saved in the same second.
+    filename = f"{timestamp}_{digest[:12]}_{uuid4().hex[:12]}"
+
     html_path = output_dir / f"{filename}.html"
     metadata_path = output_dir / f"{filename}.metadata.json"
 
@@ -112,6 +117,8 @@ def save_snapshot(ticker: str, payload: bytes, filing: dict) -> Path:
     temp_html = html_path.with_suffix(".html.tmp")
     temp_metadata = metadata_path.with_suffix(".json.tmp")
 
+    published_html = False
+
     try:
         temp_html.write_bytes(payload)
         temp_metadata.write_text(
@@ -119,13 +126,29 @@ def save_snapshot(ticker: str, payload: bytes, filing: dict) -> Path:
             encoding="utf-8",
         )
 
+        # Never intentionally overwrite an existing snapshot.
+        if html_path.exists() or metadata_path.exists():
+            raise FileExistsError(
+                f"Snapshot destination already exists: {filename}"
+            )
+
         os.replace(temp_html, html_path)
+        published_html = True
+
         os.replace(temp_metadata, metadata_path)
+
+    except Exception:
+        # Roll back only the HTML file published by this invocation.
+        if published_html:
+            html_path.unlink(missing_ok=True)
+        raise
+
     finally:
         temp_html.unlink(missing_ok=True)
         temp_metadata.unlink(missing_ok=True)
 
     return html_path
+
 
 
 def main():
