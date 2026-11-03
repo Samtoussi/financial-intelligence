@@ -26,6 +26,50 @@ def invoke(monkeypatch, result, profile):
     return runner.main(['--profile',profile,'--generation-mode','m003-v2']), generated
 
 
+@pytest.fixture
+def saved_jpm_run(tmp_path, monkeypatch):
+    directory = tmp_path / 'jpm-run'
+    directory.mkdir()
+    accession = assembly.get_profile('jpm_2026_q2')['report']['accession']
+    # Deliberately no MSFT/CAT sections or evidence: reject before reading them.
+    for name, value in {
+        'source.json': {'accession': accession},
+        'run.json': {'profile': 'jpm_2026_q2', 'status': 'failed_preserved', 'overall_pass': False},
+        'evaluation.json': {'automatic_pass': False, 'overall_pass': False},
+        'presentation_evaluation.json': {'automatic_pass': False},
+        'live_attempt.json': {'attempt_count': 1},
+    }.items():
+        (directory / name).write_text(json.dumps(value), encoding='utf-8')
+    def forbidden(*args, **kwargs):
+        pytest.fail('JPM rejection must not evaluate, generate, fetch or write artifacts')
+    for name in ('write_json', 'build_report_evidence', 'evaluate_report', 'run_baseline', 'run_banking', 'fetch'):
+        monkeypatch.setattr(runner, name, forbidden)
+    return directory
+
+
+@pytest.mark.parametrize('profile', [None, 'jpm_2026_q2', 'msft_fy2026_q1'])
+def test_jpm_reevaluation_rejected_without_writes(saved_jpm_run, profile):
+    before = {p.name: p.read_bytes() for p in saved_jpm_run.iterdir()}
+    with pytest.raises(runner.UnsupportedJPMReevaluation, match='JPM --evaluate-run is not supported'):
+        runner.reevaluate(saved_jpm_run, profile=profile, reviews={'unused': 'must not promote'})
+    assert {p.name: p.read_bytes() for p in saved_jpm_run.iterdir()} == before
+
+
+@pytest.mark.parametrize('profile', [None, 'jpm_2026_q2', 'msft_fy2026_q1'])
+def test_jpm_evaluate_run_cli_has_actionable_rejection(saved_jpm_run, profile, capsys):
+    before = {p.name: p.read_bytes() for p in saved_jpm_run.iterdir()}
+    arguments = ['--evaluate-run', str(saved_jpm_run)]
+    if profile is not None:
+        arguments += ['--profile', profile]
+    assert runner.main(arguments) == 1
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert 'JPM --evaluate-run is not supported' in captured.err
+    assert 'evaluation.json' in captured.err and 'docs/operations.md' in captured.err
+    assert 'Traceback' not in captured.err and 'KeyError' not in captured.err
+    assert {p.name: p.read_bytes() for p in saved_jpm_run.iterdir()} == before
+
+
 def test_jpm_cli_saved_response_with_generation_mocked(jpm_case,monkeypatch,capsys):
     saved = Path('evals/reports/m006/final-presentations/step5_20261031T174931Z_63f650d6')
     if (saved/'evaluation.json').exists():

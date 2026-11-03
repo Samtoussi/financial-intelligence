@@ -290,7 +290,7 @@ Generation needs pinned source artifacts, a configured profile and API access. M
 
 The legacy default is the separate MSFT FY2027 Q1 experiment. Use the milestone guides below for exact source preparation instead of treating the CLI as an arbitrary-ticker summarizer.
 
-`--evaluate-run` makes no model/SEC call, but **writes evaluation and run metadata**. The investor renderer writes a new presentation from eligible inputs. Neither is a read-only public-integrity command.
+`--evaluate-run` supports Microsoft/Caterpillar saved runs only. It makes no model/SEC call, but **writes evaluation and run metadata**. JPM is explicitly rejected without changing saved artifacts; see [quarterly re-evaluation](docs/operations.md#quarterly-report-re-evaluation). The investor renderer writes a new presentation from eligible inputs. Neither is a read-only public-integrity command.
 
 The quarterly runner returns 0 for overall pass, 2 for automatic pass with review pending, and 1 for failure. Human acceptance does not trigger automatic publication.
 

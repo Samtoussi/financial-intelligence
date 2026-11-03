@@ -28,10 +28,23 @@ def write_json(path, data):
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
+class UnsupportedJPMReevaluation(ValueError):
+    """Safe, user-facing rejection of the unsupported banking replay path."""
+
+
 def reevaluate(run_dir: Path, *, reviews=None, profile=None):
     read = lambda name: json.loads((run_dir / name).read_text(encoding="utf-8"))
-    source, evidence = read("source.json"), read("evidence.json")
+    source = read("source.json")
     selected = profile or profile_for_accession(source["accession"])
+    if (selected == "jpm_2026_q2"
+            or source.get("accession") == get_profile("jpm_2026_q2")["report"]["accession"]):
+        raise UnsupportedJPMReevaluation(
+            "JPM --evaluate-run is not supported. Inspect the saved evaluation.json, "
+            "presentation_evaluation.json and run.json without modifying them; see "
+            "docs/operations.md (Quarterly report re-evaluation). Generic re-evaluation "
+            "is available only for Microsoft/Caterpillar profiles."
+        )
+    evidence = read("evidence.json")
     profile_path = run_dir / "profile.json"
     if profile_path.exists() and json.loads(profile_path.read_text(encoding="utf-8")) != json.loads(json.dumps(get_profile(selected))):
         raise ValueError("Saved profile disagrees with selected filing configuration")
@@ -289,7 +302,7 @@ def main(argv=None):
     parser.add_argument("--download", action="store_true", help="Fetch the pinned accession from SEC")
     parser.add_argument("--generation-mode", choices=("legacy", report_assembly.MODE), default="legacy")
     parser.add_argument("--model", default=MODEL)
-    parser.add_argument("--evaluate-run", type=Path, help="Re-evaluate saved output without model/SEC calls")
+    parser.add_argument("--evaluate-run", type=Path, help="Re-evaluate saved Microsoft/Caterpillar output without model/SEC calls; JPM is unsupported")
     parser.add_argument("--reviews", type=Path, help="Manual review JSON keyed by the three case IDs")
     args = parser.parse_args(argv)
     if args.reviews and not args.evaluate_run:
@@ -303,6 +316,9 @@ def main(argv=None):
             result = reevaluate(run_dir, reviews=reviews, profile=args.profile)
         else:
             run_dir, result = run_baseline(snapshot_path=args.snapshot, download=args.download, model=args.model, profile=args.profile or DEFAULT_PROFILE, generation_mode=args.generation_mode)
+    except UnsupportedJPMReevaluation as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     except (RuntimeError, ValueError, OSError) as exc:
         print(f"Quarterly report could not complete ({type(exc).__name__}). Check the latest run.json and local configuration.", file=sys.stderr)
         return 1

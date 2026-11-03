@@ -109,6 +109,28 @@ CompanyFacts snapshots use corresponding temporary-file and rollback protections
 
 Before retrying, inspect the failure and verify that its cause has been addressed. A successful retry does not rewrite the previous run's failure status.
 
+## Quarterly report re-evaluation
+
+`python evals/run_report.py --evaluate-run <run-directory>` supports saved
+Microsoft and Caterpillar runs. It makes no SEC or model calls, but writes
+`evaluation.json` and updates `run.json`. Use `--reviews <review-json>` only
+with the applicable completed manual-review records.
+
+JPM `--evaluate-run` is explicitly unsupported and returns exit code 1 with an
+actionable message, whether the JPM profile is supplied or inferred from the
+saved source accession. Rejection does not modify saved artifacts or invoke
+generation, source downloads, attempt-ledger updates or review promotion.
+
+For JPM, inspect the saved `evaluation.json`, `presentation_evaluation.json`
+and `run.json` directly. Saved results are historical evidence, not a fresh
+evaluation. M006's documented offline replay used the banking-specific evaluators
+and original source artifacts; it was not generic `--evaluate-run` support.
+Those evaluators require the financial foundation, original source and extraction
+validation, raw narrative and accounting-scope checks. No general JPM replay CLI
+is provided. Do not use generation as a substitute for re-evaluation or reset
+the live-attempt ledger. Existing source-verification, attempt and human-review
+gates remain in force.
+
 ## Known Limitations
 
 - There is no automatic retry scheduler or checkpoint-based resume.
