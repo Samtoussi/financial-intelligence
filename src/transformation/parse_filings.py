@@ -69,6 +69,28 @@ def load_latest_snapshot(
     return payload, metadata
 
 
+def resolve_cached_snapshot(ticker: str, *, accession: str, form: str) -> Path:
+    """Resolve a unique cached filing without relying on its filename format.
+
+    Repeated retrievals remain separate artifacts. Require explicit selection
+    when more than one exists rather than choosing by filesystem timestamps.
+    """
+    if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", accession):
+        raise ValueError("Invalid accession")
+    snapshots = sorted((RAW_DIR / ticker / accession).glob("*.html"))
+    if not snapshots:
+        raise FileNotFoundError(f"No filing snapshot for {ticker}, accession={accession}")
+    if len(snapshots) != 1:
+        raise ValueError("Ambiguous cached filing snapshots; select an explicit --snapshot")
+    path = snapshots[0]
+    _, metadata = load_latest_snapshot(
+        ticker, accession=accession, form=form, snapshot_path=path,
+    )
+    if metadata.get("cik") != COMPANIES[ticker]:
+        raise ValueError("Snapshot CIK mismatch")
+    return path
+
+
 def quarterly_boundaries(soup: BeautifulSoup, *, cat_layout=False) -> list[Tag]:
     """Bounded Microsoft layout: resolve the three Part I TOC destinations.
 

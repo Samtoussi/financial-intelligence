@@ -19,7 +19,7 @@ from src.ai.report_generator import (MODEL, generate_report, render_report, outp
 from src.evaluation.report_ground_truth import load_report_dataset
 from src.evaluation.report_evaluation import evaluate_report
 from src.ingestion.filings import discover_filing, fetch, save_snapshot
-from src.transformation.parse_filings import load_latest_snapshot
+from src.transformation.parse_filings import load_latest_snapshot, resolve_cached_snapshot
 from src.transformation.store_filings import prepare_sections, save_sections
 from src.transformation.chunk_filings import process_ticker
 
@@ -98,13 +98,13 @@ def run_baseline(*, snapshot_path=None, download=False, client=None, model=MODEL
             )) or filing["report_date"] != report["period_end"]:
                 raise ValueError("SEC discovery disagrees with pinned report")
             snapshot_path = save_snapshot(ticker, fetch(filing["source_url"], user_agent), filing)
-        _, metadata = load_latest_snapshot(ticker, form="10-Q", accession=report["accession"],
-                                           snapshot_path=snapshot_path)
         # Resolve once to an explicit path before any subsequent processing.
         if snapshot_path is None:
-            snapshot_path = ROOT / "data/raw/sec/filings" / ticker / report["accession"] / (
-                datetime.fromisoformat(metadata["retrieved_at_utc"]).strftime("%Y%m%dT%H%M%SZ")
-                + "_" + metadata["sha256"][:12] + ".html")
+            snapshot_path = resolve_cached_snapshot(
+                ticker, form="10-Q", accession=report["accession"],
+            )
+        _, metadata = load_latest_snapshot(ticker, form="10-Q", accession=report["accession"],
+                                           snapshot_path=snapshot_path)
         sections = prepare_sections(ticker, form="10-Q", accession=report["accession"],
                                     snapshot_path=snapshot_path)
         evidence = build_report_evidence(sections, metadata, profile=profile)

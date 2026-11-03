@@ -312,6 +312,74 @@ def test_mocked_end_to_end_saved_run(bundle, tmp_path, monkeypatch):
         run_report.reevaluate(run_dir)
 
 
+@pytest.mark.parametrize("legacy_name", [False, True])
+def test_cached_snapshot_resolution_uses_actual_path(bundle, tmp_path, monkeypatch, legacy_name):
+    from evals import run_report
+    snapshot = bundle.snapshot
+    if legacy_name:
+        renamed = snapshot.with_name("_".join(snapshot.stem.split("_")[:2]) + ".html")
+        snapshot.with_suffix(".metadata.json").rename(renamed.with_suffix(".metadata.json"))
+        snapshot.rename(renamed)
+        snapshot = renamed
+    monkeypatch.setattr(run_report, "save_sections", lambda *a: None)
+    monkeypatch.setattr(run_report, "process_ticker", lambda *a: None)
+    monkeypatch.setattr(run_report, "fetch", lambda *a: pytest.fail("Unexpected SEC call"))
+    client = mock_client(bundle.report)
+    directory, result = run_report.run_baseline(client=client, reports_dir=tmp_path / "reports")
+    assert result["automatic_pass"]
+    source = json.loads((directory / "source.json").read_text(encoding="utf-8"))
+    assert source["snapshot_path"] == str(snapshot.resolve())
+    client.responses.create.assert_called_once()
+
+
+def test_cached_snapshot_ambiguity_requires_explicit_selection(bundle, tmp_path, monkeypatch):
+    from evals import run_report
+    filings.save_snapshot("MSFT", sample_html(), bundle.metadata)
+    client = mock_client(bundle.report)
+    with pytest.raises(RuntimeError, match="incomplete"):
+        run_report.run_baseline(client=client, reports_dir=tmp_path / "ambiguous")
+    client.responses.create.assert_not_called()
+    with pytest.raises(ValueError, match="Ambiguous"):
+        parse_filings.resolve_cached_snapshot("MSFT", form="10-Q", accession=REPORT["accession"])
+    monkeypatch.setattr(run_report, "save_sections", lambda *a: None)
+    monkeypatch.setattr(run_report, "process_ticker", lambda *a: None)
+    directory, result = run_report.run_baseline(
+        snapshot_path=bundle.snapshot, client=client, reports_dir=tmp_path / "explicit",
+    )
+    assert result["automatic_pass"]
+    assert json.loads((directory / "source.json").read_text())["snapshot_path"] == str(bundle.snapshot.resolve())
+    client.responses.create.assert_called_once()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("ticker", "CAT"), ("cik", 18230), ("form", "10-K"),
+    ("accession", "0001193125-26-999999"), ("sha256", "0" * 64),
+])
+def test_cached_snapshot_rejects_wrong_metadata(bundle, field, value):
+    path = bundle.snapshot.with_suffix(".metadata.json")
+    metadata = json.loads(path.read_text())
+    metadata[field] = value
+    path.write_text(json.dumps(metadata), encoding="utf-8")
+    with pytest.raises(ValueError):
+        parse_filings.resolve_cached_snapshot("MSFT", form="10-Q", accession=REPORT["accession"])
+
+
+def test_cached_snapshot_rejects_tampering_and_missing_metadata(bundle):
+    bundle.snapshot.write_bytes(b"tampered")
+    with pytest.raises(ValueError, match="checksum"):
+        parse_filings.resolve_cached_snapshot("MSFT", form="10-Q", accession=REPORT["accession"])
+    bundle.snapshot.with_suffix(".metadata.json").unlink()
+    with pytest.raises(FileNotFoundError):
+        parse_filings.resolve_cached_snapshot("MSFT", form="10-Q", accession=REPORT["accession"])
+
+
+def test_cached_snapshot_requires_exact_accession(bundle):
+    with pytest.raises(FileNotFoundError):
+        parse_filings.resolve_cached_snapshot("MSFT", form="10-Q", accession="0001193125-26-999999")
+    with pytest.raises(ValueError, match="Invalid accession"):
+        parse_filings.resolve_cached_snapshot("MSFT", form="10-Q", accession="../escape")
+
+
 def test_failed_generation_saves_sanitized_artifacts(bundle, tmp_path, monkeypatch):
     from evals import run_report
     monkeypatch.setattr(run_report, "save_sections", lambda *a: None)
