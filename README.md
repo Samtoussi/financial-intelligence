@@ -43,9 +43,9 @@ Financial disclosures combine repeated observations, changing accounting bases, 
 
 The project implements three connected workflows:
 
-- **Annual analytics:** ingest CompanyFacts, preserve snapshots, normalize observations and build comparable revenue/YoY models for MSFT, CAT and JPM.
-- **Filing intelligence:** extract filing sections, retrieve evidence and combine it with structured metrics in a contextual AI Analyst.
-- **Quarterly reporting:** apply explicit contracts to selected 10-Q filings, calculate financials deterministically and evaluate source-bound interpretation before investor presentation.
+- **Annual analytics:** SEC CompanyFacts -> Bronze JSON snapshots -> Silver Parquet -> DuckDB -> dbt Gold revenue/YoY models for MSFT, CAT and JPM.
+- **Interactive AI Analyst:** SEC filings -> sections/chunks -> lexical retrieval -> grounded responses, with separate annual Gold-backed financial tools.
+- **Curated quarterly reports:** pinned 10-Q filings -> deterministic financials -> AI commentary -> evaluation -> human review -> presentation. Quarterly figures come from filing tables, **not CompanyFacts/dbt Gold**.
 
 This is a local, manually invoked portfolio system. The portable showcase demonstrates saved results; it does not run ingestion or generate new reports when opened.
 
@@ -54,6 +54,8 @@ This is a local, manually invoked portfolio system. The portable showcase demons
 <a href="assets/architecture_m006r.svg"><img src="assets/architecture_m006r.svg" alt="Current M006-R architecture: annual CompanyFacts analytics, filing intelligence and evaluated quarterly reporting with a separate portable public showcase" width="1100"></a>
 
 [Full-size diagram and editable SVG](assets/architecture_m006r.svg). The original [PNG](assets/architecture.png) and [SVG](assets/architecture.svg) are preserved as earlier architecture references.
+
+The M006-R diagram still describes the three data paths. Later run tracking, incremental processing and runtime warehouse configuration are documented in [Operations](docs/operations.md).
 
 | Workflow | Storage and processing | Consumer |
 |---|---|---|
@@ -109,7 +111,7 @@ A saved CompanyFacts snapshot can be replayed offline using `python -m src.trans
 
 ### 3. Build governed annual metrics with dbt
 
-[annual_revenue.sql](dbt/models/gold/annual_revenue.sql) filters annual USD observations and ranks revenue concepts separately by company. It selects one observation per company/year-end, using filing recency and deterministic tie-breaks, and exposes the source concept and filing metadata.
+[annual_revenue.sql](dbt/models/gold/annual_revenue.sql) filters annual USD observations and ranks revenue concepts separately by company. It selects one observation per company/year-end, ordering by concept priority, filing date, accession and start date, and exposes source filing metadata. Conflicting values can still tie on all ordering fields; this is not complete conflict resolution.
 
 [annual_revenue_growth.sql](dbt/models/gold/annual_revenue_growth.sql) uses consecutive fiscal years and a positive prior value for growth. It suppresses the known Microsoft FY2016 basis mismatch rather than comparing recast revenue with the older FY2015 basis.
 
@@ -220,11 +222,11 @@ MSFT distinguishes GAAP/adjusted earnings and Azure growth versus Cloud margin. 
 
 | Case | Semantic / presentation evidence | Public derivative status |
 |---|---|---|
-| MSFT | Passed saved semantic reviews; presentation acceptance documented in M004; archived presentation record remains pending | Separate owner content approval, subject to rights restrictions |
+| MSFT | Passed saved semantic reviews; M004 acceptance documented with archived status pending; a separate M011 copy has hash-bound owner approval | Separate owner content approval; M011 approval does not transfer |
 | CAT | Separate passed reviews and hash-bound acceptance for the original presentation | Separate owner content approval; original approval is not transferred |
 | JPM | Acceptance documented in M006; archived reviews remain pending; no final hash-bound original presentation approval | Separate owner content approval, subject to rights restrictions |
 
-MSFT also has no final hash-bound original presentation approval. Separate [owner content approval](showcase/quarterly/publication_approval.json) now binds the six public Markdown files to their exact hashes, subject to remaining rights restrictions. It is not legal clearance or issuer permission. No concrete restriction was identified in the local review; SEC access alone does not establish rights. See [NOTICE.md](showcase/quarterly/NOTICE.md).
+The original MSFT M004 archive remains without its original final hash-bound presentation approval. A separate M011 Microsoft presentation copy received owner approval; its local combined review result does not alter the original automatic-only evaluator or approve public derivatives. See [review boundaries](docs/operations.md#microsoft-presentation-approval-boundaries). Separate [owner content approval](showcase/quarterly/publication_approval.json) binds the six public Markdown files to their exact hashes, subject to remaining rights restrictions. It is not legal clearance or issuer permission. No concrete restriction was identified in the local review; SEC access alone does not establish rights. See [NOTICE.md](showcase/quarterly/NOTICE.md).
 
 ## Getting Started
 
@@ -294,20 +296,23 @@ The legacy default is the separate MSFT FY2027 Q1 experiment. Use the milestone 
 
 The quarterly runner returns 0 for overall pass, 2 for automatic pass with review pending, and 1 for failure. Human acceptance does not trigger automatic publication.
 
+For one bounded case, follow the [Microsoft FY2026 Q1 reproduction recipe](docs/operations.md#microsoft-fy2026-q1-reproduction): replay saved output offline, or explicitly select a cached filing for a new paid model call. Rendering returns 2 while presentation review is pending.
+
 ## Testing & Reliability
 
 ### Run the offline suites
 
 ```powershell
-# Full suite; model behavior uses controlled responses.
-python -m pytest tests -q
-
-# Public integrity and private saved-report review distinctions.
-python -m pytest tests/test_public_quarterly_reports.py tests/test_quarterly_reports.py -q
-
-# Optional: against a populated local financial warehouse.
+# Fresh checkout, installed dependencies, repository root, FI_DUCKDB_PATH unset.
+# Writes a synthetic warehouse; refuses to overwrite an existing database.
+python scripts/create_ci_db.py
 dbt build --project-dir dbt --profiles-dir dbt
+python -m pytest tests -v
 ```
+
+This follows [CI](.github/workflows/ci.yml): dbt prepares Gold tables required by warehouse-dependent tests. After dependency installation, these steps need no SEC or OpenAI access. Use a fresh checkout for fixture preparation; do not replace an existing local warehouse. See [test preparation](docs/operations.md#offline-test-preparation).
+
+For credential-free public-showcase checks without warehouse preparation: `python -m pytest tests/test_public_quarterly_reports.py -q`. The full suite additionally covers warehouse queries and controlled model responses; cached-source checks may skip when private artifacts are absent.
 
 **Recorded local verification:** 1,111 Python tests passed with 14 parser warnings; the focused public/private report suites passed 163 tests. These are historical local results, not a new dependency-install test or a statistical reliability estimate for live generation.
 
@@ -368,13 +373,13 @@ The system avoids additional orchestration, cloud services and storage layers be
 - Analyst inference sends question/context and supporting evidence to an external API. Displayed history is not reused as conversational context; progressive display begins after analysis completes.
 - Publication-derivative content approval is recorded separately from original reviews and independent evaluation. It is conditional on resolving any concrete applicable rights restriction. General legal uncertainty remains; no specific restriction or redistribution permission was established by the local review.
 
-### Possible next steps, not implemented
+### Deferred ideas outside this release
 
 1. Add a reporting-period filter to filing retrieval before broadening its historical-analysis use.
 2. Extend one explicitly selected filing at a time, with new extraction bindings, independent oracle evidence and semantic review.
 3. Improve fresh-install/reproduction documentation as additional environments are actually verified.
 
-These are bounded directions, not delivered features or an infrastructure commitment. This remains an engineering portfolio project, not an investment advisory service.
+These are deferred ideas, not release requirements or a commitment to further milestones. This remains an engineering portfolio project, not an investment advisory service.
 
 ## Further Documentation
 

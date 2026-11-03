@@ -138,6 +138,122 @@ is provided. Do not use generation as a substitute for re-evaluation or reset
 the live-attempt ledger. Existing source-verification, attempt and human-review
 gates remain in force.
 
+## Microsoft FY2026 Q1 reproduction
+
+Run from the repository root with the existing virtual environment and installed
+dependencies. The supported profile is `msft_fy2026_q1`: CIK 789019, 10-Q accession
+`0001193125-25-256321`, document `msft-20250930.htm`, filed October 29, 2025,
+covering July–September 2025 versus July–September 2024. These quarterly values
+come from filing tables, not CompanyFacts or dbt Gold. See
+[profile configuration](../src/analytics/report_profiles.py) and
+[report runner](../evals/run_report.py).
+
+### Offline replay of the reviewed saved run
+
+This route requires the existing local `evals/reports/m003/20261030T211637Z_de30375b`
+archive, including its saved source/evidence, raw response, oracle and `review.json`.
+It is ignored runtime evidence and is **not available in a fresh clone**. No model
+or SEC call is made. Copy it before re-evaluating: the CLI writes `evaluation.json`
+and `run.json`. This validates saved output; it does not generate new AI commentary.
+
+```powershell
+$py = '.\.venv\Scripts\python.exe'
+$original = 'evals/reports/m003/20261030T211637Z_de30375b'
+$work = Join-Path 'data/release-validation' ('msft-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $work | Out-Null
+$run = Join-Path $work 'saved-run'
+Copy-Item -LiteralPath $original -Destination $run -Recurse
+& $py -B evals/run_report.py --profile msft_fy2026_q1 --evaluate-run $run --reviews (Join-Path $run 'review.json')
+```
+
+Expected exit code: 0 if current automatic checks and the saved semantic reviews
+pass. The reviewer attribution remains historical; copying does not create a new
+review. Omitting `--reviews` makes semantic reviews pending again. Preserve the
+original archive and its historical failures.
+
+### New inference from an explicitly selected filing
+
+Deterministic assembly (`m003-v2`) owns financial extraction and calculations;
+it does **not** make new commentary generation offline. The following command
+uses cached HTML without SEC access but makes one paid OpenAI call, with SDK
+retries disabled. Configure `OPENAI_API_KEY` in the process environment or root
+`.env`; do not put credentials in version control.
+
+The existing local snapshot is shown explicitly below. It and its matching
+metadata sidecar must exist; a fresh clone has neither. To acquire the pinned
+source, first set `SEC_USER_AGENT` to an application name and real contact email,
+then run `python -m run_filings MSFT --form 10-Q --accession 0001193125-25-256321`.
+That command requires SEC access and writes a new raw snapshot, sections, company
+chunks and an execution manifest, without triggering AI. Use its exact printed
+`Snapshot:` path in place of the cached path below. Do not select a different filing.
+
+```powershell
+$py = '.\.venv\Scripts\python.exe'
+$snapshot = 'data/raw/sec/filings/MSFT/0001193125-25-256321/20261030T184859Z_ddc8ccac31f5.html'
+& $py -B evals/run_report.py --profile msft_fy2026_q1 --generation-mode m003-v2 --snapshot $snapshot
+```
+
+Generation writes a new run under `evals/reports/m003/`, and updates stored
+sections/company chunks. It saves source evidence, assembly inputs, model output,
+summary, evaluation and review template. Expected exit code: 2 for automatic pass
+with semantic review pending; 1 for failure. Inspect artifacts before proceeding.
+Explicit snapshot selection avoids ambiguity if the accession has multiple cached
+copies. Do not use the default profile or legacy generation mode for this recipe.
+
+Set `$run` to the exact `run_dir` printed by generation. Copy that new run's
+`review_template.json` to `review.json` only if no review exists:
+
+```powershell
+$run = '<run_dir printed by generation>'
+Copy-Item -LiteralPath (Join-Path $run 'review_template.json') -Destination (Join-Path $run 'review.json')
+```
+
+A human must
+review all three notes against cited evidence and complete status, reviewer,
+rationale and evidence IDs. Do not copy approval from an older model response.
+Then re-evaluate offline:
+
+```powershell
+& $py -B evals/run_report.py --profile msft_fy2026_q1 --evaluate-run $run --reviews (Join-Path $run 'review.json')
+```
+
+Only proceed to rendering when automatic and semantic gates pass (exit code 0).
+For a new run, first set `$work` to a new validation directory as in the offline
+example; keep presentation output separate from the source run.
+
+### Offline presentation and manual acceptance
+
+Both routes converge on an eligible `$run`. Rendering uses saved artifacts and
+makes no SEC/OpenAI calls. It writes a new timestamped presentation directory:
+
+```powershell
+& $py -B evals/render_investor_report.py --run $run --output-root (Join-Path $work 'presentations')
+```
+
+Exit code **2** means automatic presentation checks passed and manual presentation
+review is pending; it is not overall acceptance. Inspect `report.md`,
+`supporting_detail.md`, `presentation_evaluation.json` and `review_template.json`
+in the printed `output_directory`. Human presentation review covers clarity,
+faithful comparisons, narrative context/citations, formatting and completeness.
+Record approval separately with the exact report/detail hashes. The existing
+automatic-only evaluator has no approval/promotion CLI and retains
+`overall_pass: false`; a separate combined approval record must not be presented
+as its native output. No command grants implicit approval or publishes a report.
+
+### Microsoft presentation approval boundaries
+
+The original M004 presentation archive retains its generation-time pending state
+and lacks its original final hash-bound approval; acceptance was documented in
+[M004](../evals/M004.md#final-presentation-approval-and-git-checkpoint).
+A separate M011 copy at
+`data/m011/msft-4b0d09e6d89740999de65b9ca5821ae7/presentations/20261103T172731Z_ab850fb4/`
+received project-owner approval in `presentation_review.json`. Its
+`reviewed_presentation_evaluation.json` combines automatic checks and that
+hash-bound approval with `overall_pass: true`; it does not modify the evaluator
+or original archive. These local records remain ignored. They do not approve
+public showcase derivatives, which have their own
+[content approval](../showcase/quarterly/publication_approval.json).
+
 ## Known Limitations
 
 - There is no automatic retry scheduler or checkpoint-based resume.
@@ -150,12 +266,36 @@ These limitations are accepted for the current manually operated portfolio scope
 
 ## Verification
 
-Run the complete test suite from the repository root:
+### Offline test preparation
+
+Use an installed environment in a fresh checkout, from the repository root. Follow
+[CI](../.github/workflows/ci.yml): create the synthetic financial warehouse, build
+and test dbt Gold, then run pytest. Fixture creation **refuses to overwrite an
+existing database**; do not delete or replace a populated local warehouse for this
+recipe. The fixture script uses the default path rather than `FI_DUCKDB_PATH`, so
+ensure that override is unset for this preparation:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+Remove-Item Env:FI_DUCKDB_PATH -ErrorAction SilentlyContinue
+python scripts/create_ci_db.py
+dbt build --project-dir dbt --profiles-dir dbt
+python -m pytest tests -v
 ```
 
+Dependencies must already be installed and the virtual environment activated.
+These commands write synthetic data, dbt artifacts and test outputs, but make no
+SEC or OpenAI calls. Fixture rows support warehouse-dependent query tests; they
+are not real-source verification. Tests using private cached filings can skip.
+
+Public-showcase checks need installed dependencies but no warehouse, credentials
+or private report archive: `python -m pytest tests/test_public_quarterly_reports.py -q`.
+They verify the public package and route isolation, not fresh SEC evaluation.
+
+### Historical verification
+
 M009 verification baseline: 1,180 tests passed, 4 skipped, 14 parser warnings, November 2026.
+
+This is the preserved milestone baseline, not current release-candidate evidence.
+The current release checkpoint is handled separately in M012-C.
 
 The parser warnings are related to XML documents processed using an HTML parser and are tracked separately from operational reliability.
