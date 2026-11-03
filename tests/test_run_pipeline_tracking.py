@@ -9,7 +9,9 @@ import run_pipeline
 
 
 @pytest.fixture(autouse=True)
-def restore_working_directory():
+def restore_working_directory(tmp_path, monkeypatch):
+    # Tracking tests mock data loading; never read the shared CI/local warehouse.
+    monkeypatch.setenv("FI_DUCKDB_PATH", str(tmp_path / "warehouse.duckdb"))
     original = Path.cwd()
     try:
         yield
