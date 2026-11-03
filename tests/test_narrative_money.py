@@ -1,3 +1,4 @@
+
 """M005 unit regression: exact defective model text, never an approved response."""
 import copy
 import hashlib
@@ -11,8 +12,9 @@ from src.ai import report_assembly as assembly
 from src.analytics.narrative_money import validate_monetary_narrative
 from src.evaluation.report_evaluation import evaluate_report
 
-FIXTURE = Path('tests/fixtures/cat_m005_defective_notes.json')
-HISTORICAL = Path('evals/reports/m005/live/20261031T122747Z_afd425eb')
+ROOT = Path(__file__).resolve().parents[1]
+FIXTURE = ROOT / 'tests/fixtures/cat_m005_defective_notes.json'
+HISTORICAL = ROOT / 'evals/reports/m005/live/20261031T122747Z_afd425eb'
 
 
 def defective_notes():

@@ -1,3 +1,4 @@
+
 """M005 real-source excerpt contracts; controlled notes are never human approvals."""
 import copy
 import hashlib
@@ -20,13 +21,14 @@ from src.ingestion import filings
 from src.transformation import parse_filings, store_filings, chunk_filings
 
 PROFILE = 'cat_2026_q1'
+FIXTURE_PATH = Path(__file__).resolve().parent / 'fixtures' / 'cat_2026_q1_excerpt.html'
 
 
 def controlled_notes(prepared):
     texts = {
         'gaap_vs_non_gaap': 'GAAP diluted EPS was $5.47 versus $4.20. Adjusted EPS was $5.54 versus $4.25, excluding restructuring costs of $0.07 and $0.05 per share, respectively.',
         'segment_comparability': 'The 2025 segment information was retrospectively adjusted to the 2026 presentation. Rail-related responsibilities moved from Power & Energy to Resource Industries effective January 1, 2026.',
-        'sales_volume_and_price': 'Caterpillar attributed the increase in consolidated sales and revenues primarily to higher sales volume of $2.3 billion and favorable price realization of $426 million.',
+        'sales_volume_and_price': 'Caterpillar attributed the increase in consolidated sales and revenues primarily to higher sales volume of $2.3billion and favorable price realization of $426 million.',
     }
     return {'notes': [{'id': nid, 'text': text,
         'span_ids': [s['span_id'] for s in prepared['spans'] if s['claim_id'] == nid]}
@@ -52,7 +54,7 @@ def cat_case(tmp_path, monkeypatch):
     monkeypatch.setattr(runner, 'save_sections', lambda ticker, sections: store_filings.save_sections(ticker, sections, tmp_path/'sections'))
     filing = {k: c['report'][k] for k in ('cik','form','accession','filing_date','document','source_url')}
     filing['report_date'] = c['report']['period_end']
-    snapshot = filings.save_snapshot('CAT', Path('tests/fixtures/cat_2026_q1_excerpt.html').read_bytes(), filing)
+    snapshot = filings.save_snapshot('CAT', FIXTURE_PATH.read_bytes(), filing)
     sections = store_filings.prepare_sections('CAT', form='10-Q', accession=filing['accession'], snapshot_path=snapshot)
     _, meta = parse_filings.load_latest_snapshot('CAT', form='10-Q', accession=filing['accession'], snapshot_path=snapshot)
     evidence = build_report_evidence(sections, meta, profile=PROFILE)
