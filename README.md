@@ -35,7 +35,7 @@ Financial Intelligence turns SEC CompanyFacts and filing HTML into a local analy
 
 Click a screenshot for full size. **The three saved quarterly reports run without API keys, SEC downloads or local warehouse data.**
 
-[Quick start](#getting-started) | [Architecture](#architecture) | [Engineering challenges](#engineering-challenges--solutions) | [Verified results](#verified-results) | [Testing](#testing--reliability)
+[Quick start](#getting-started) | [Architecture](#architecture) | [Engineering challenges](#engineering-challenges--solutions) | [Verified results](#verified-results) | [Testing](#testing--reliability) | [Operations](docs/operations.md)
 
 ## Overview
 
