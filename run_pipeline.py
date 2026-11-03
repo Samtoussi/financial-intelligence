@@ -1,4 +1,6 @@
 
+import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -11,6 +13,7 @@ from src.ingestion.companyfacts import (
     save_snapshot,
     validate_companyfacts,
 )
+from src.operations.run_tracking import RunTracker
 from src.transformation.load_companyfacts import (
     load_duckdb,
     normalize,
@@ -18,94 +21,138 @@ from src.transformation.load_companyfacts import (
     write_parquet,
 )
 
-import hashlib
-import json
-
 
 ROOT = Path(__file__).resolve().parent
 
 
 def run_pipeline():
     start = time.perf_counter()
-
     os.chdir(ROOT)
 
-    user_agent = os.environ.get("SEC_USER_AGENT", "").strip()
+    tracker = RunTracker("companyfacts", ROOT)
+    print(f"\nRUN ID: {tracker.run_id}")
+    print(f"Manifest: {tracker.manifest_path}")
 
-    if not user_agent or "@" not in user_agent:
-        raise ValueError(
-            "Set SEC_USER_AGENT to an identifying application "
-            "name and your real contact email."
-        )
+    try:
+        tracker.start_stage("preflight")
 
-    for ticker, cik in COMPANIES.items():
+        user_agent = os.environ.get("SEC_USER_AGENT", "").strip()
+
+        if not user_agent or "@" not in user_agent:
+            raise ValueError(
+                "Set SEC_USER_AGENT to an identifying application "
+                "name and your real contact email."
+            )
+
+        tracker.complete_stage()
+
+        for ticker, cik in COMPANIES.items():
+            print(f"\n{'=' * 60}")
+            print(f"PROCESSING {ticker} (CIK {cik})")
+            print("=" * 60)
+
+            # Bronze: SEC EDGAR -> raw JSON
+            tracker.start_stage("bronze", ticker)
+            print("\n[BRONZE] Fetching SEC CompanyFacts...")
+
+            payload = fetch_companyfacts(cik, user_agent)
+            summary = validate_companyfacts(payload, cik)
+            snapshot_path = save_snapshot(ticker, payload, summary)
+
+            snapshot_id = hashlib.sha256(payload).hexdigest()
+
+            print(f"Saved: {snapshot_path}")
+            print(f"Observations: {summary['observations']:,}")
+
+            tracker.complete_stage({
+                "snapshot_path": str(snapshot_path),
+                "snapshot_sha256": snapshot_id,
+                "observations": summary["observations"],
+            })
+
+            # Silver: raw JSON -> Parquet -> DuckDB
+            tracker.start_stage("silver", ticker)
+            print("\n[SILVER] Normalizing and loading...")
+
+            data = json.loads(payload)
+
+            retrieved_at = read_snapshot_metadata(
+                snapshot_path,
+                ticker,
+                cik,
+                snapshot_id,
+            )
+
+            rows = normalize(data, snapshot_id)
+            parquet_path = write_parquet(
+                rows,
+                ticker,
+                snapshot_id,
+            )
+
+            loaded = load_duckdb(
+                parquet_path,
+                snapshot_id,
+                len(rows),
+                cik,
+                retrieved_at,
+            )
+
+            print(f"Parquet: {parquet_path}")
+            print(f"DuckDB rows: {loaded:,}")
+
+            tracker.complete_stage({
+                "parquet_path": str(parquet_path),
+                "snapshot_sha256": snapshot_id,
+                "normalized_rows": len(rows),
+                "loaded_rows": loaded,
+            })
+
+        # Gold: dbt models + tests
+        tracker.start_stage("gold")
+
         print(f"\n{'=' * 60}")
-        print(f"PROCESSING {ticker} (CIK {cik})")
+        print("GOLD - DBT BUILD")
         print("=" * 60)
 
-        # Bronze: SEC EDGAR -> raw JSON
-        print("\n[BRONZE] Fetching SEC CompanyFacts...")
-
-        payload = fetch_companyfacts(cik, user_agent)
-        summary = validate_companyfacts(payload, cik)
-        snapshot_path = save_snapshot(ticker, payload, summary)
-
-        print(f"Saved: {snapshot_path}")
-        print(f"Observations: {summary['observations']:,}")
-
-        # Silver: raw JSON -> Parquet -> DuckDB
-        print("\n[SILVER] Normalizing and loading...")
-
-        snapshot_id = hashlib.sha256(payload).hexdigest()
-        data = json.loads(payload)
-
-        retrieved_at = read_snapshot_metadata(
-            snapshot_path,
-            ticker,
-            cik,
-            snapshot_id,
+        subprocess.run(
+            [
+                "dbt",
+                "build",
+                "--project-dir",
+                "dbt",
+                "--profiles-dir",
+                "dbt",
+            ],
+            check=True,
+            cwd=ROOT,
         )
 
-        rows = normalize(data, snapshot_id)
-        parquet_path = write_parquet(
-            rows,
-            ticker,
-            snapshot_id,
-        )
+        tracker.complete_stage({
+            "command": "dbt build",
+            "result": "success",
+        })
 
-        loaded = load_duckdb(
-            parquet_path,
-            snapshot_id,
-            len(rows),
-            cik,
-            retrieved_at,
-        )
+        tracker.complete()
 
-        print(f"Parquet: {parquet_path}")
-        print(f"DuckDB rows: {loaded:,}")
-
-    # Gold: dbt models + tests
-    print(f"\n{'=' * 60}")
-    print("GOLD — DBT BUILD")
-    print("=" * 60)
-
-    subprocess.run(
-        [
-            "dbt",
-            "build",
-            "--project-dir",
-            "dbt",
-            "--profiles-dir",
-            "dbt",
-        ],
-        check=True,
-        cwd=ROOT,
-    )
+    except Exception as exc:
+        # Preserve the original exception if tracking also fails.
+        try:
+            if tracker.manifest["status"] == "running":
+                tracker.fail(exc)
+        except Exception as tracking_error:
+            print(
+                f"RUN TRACKING FAILED: {type(tracking_error).__name__}",
+                file=sys.stderr,
+            )
+        raise
 
     elapsed = time.perf_counter() - start
 
     print(f"\n{'=' * 60}")
     print("PIPELINE COMPLETED SUCCESSFULLY")
+    print(f"Run ID: {tracker.run_id}")
+    print(f"Manifest: {tracker.manifest_path}")
     print(f"Elapsed: {elapsed:.2f}s")
     print("=" * 60)
 
@@ -114,5 +161,8 @@ if __name__ == "__main__":
     try:
         run_pipeline()
     except Exception as exc:
-        print(f"\nPIPELINE FAILED: {exc}", file=sys.stderr)
+        print(
+            f"\nPIPELINE FAILED: {type(exc).__name__}",
+            file=sys.stderr,
+        )
         sys.exit(1)
