@@ -13,6 +13,7 @@ from src.ingestion.companyfacts import (
     save_snapshot,
     validate_companyfacts,
 )
+from src.operations.dbt_results import summarize_dbt_results
 from src.operations.run_tracking import RunTracker
 from src.transformation.load_companyfacts import (
     load_duckdb,
@@ -30,6 +31,8 @@ def run_pipeline():
     os.chdir(ROOT)
 
     tracker = RunTracker("companyfacts", ROOT)
+    gold_diagnostics = None
+
     print(f"\nRUN ID: {tracker.run_id}")
     print(f"Manifest: {tracker.manifest_path}")
 
@@ -115,31 +118,71 @@ def run_pipeline():
         print("GOLD - DBT BUILD")
         print("=" * 60)
 
-        subprocess.run(
-            [
-                "dbt",
-                "build",
-                "--project-dir",
-                "dbt",
-                "--profiles-dir",
-                "dbt",
-            ],
-            check=True,
-            cwd=ROOT,
+        dbt_target = tracker.run_dir / "dbt"
+
+        warehouse_path = Path(
+            os.environ.get(
+                "FI_DUCKDB_PATH",
+                "data/warehouse/financial_intelligence.duckdb",
+            )
         )
+        if not warehouse_path.is_absolute():
+            warehouse_path = ROOT / warehouse_path
 
-        tracker.complete_stage({
-            "command": "dbt build",
-            "result": "success",
-        })
+        warehouse_path = warehouse_path.resolve()
 
+        try:
+            subprocess.run(
+                [
+                    "dbt",
+                    "build",
+                    "--project-dir",
+                    "dbt",
+                    "--profiles-dir",
+                    "dbt",
+                    "--target-path",
+                    str(dbt_target),
+                ],
+                check=True,
+                cwd=ROOT,
+            )
+        except subprocess.CalledProcessError:
+            # dbt can produce run_results.json even when build fails.
+            if (dbt_target / "run_results.json").is_file():
+                try:
+                    gold_diagnostics = summarize_dbt_results(dbt_target)
+                    gold_diagnostics["warehouse_path"] = str(warehouse_path)
+                except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+                    gold_diagnostics = {
+                        "artifact_status": "invalid",
+                        "warehouse_path": str(warehouse_path),
+                    }
+            else:
+                gold_diagnostics = {
+                    "artifact_status": "missing",
+                    "warehouse_path": str(warehouse_path),
+                }
+            raise
+
+        dbt_summary = summarize_dbt_results(dbt_target)
+        gold_diagnostics = {
+            **dbt_summary,
+            "warehouse_path": str(warehouse_path),
+        }
+
+        if dbt_summary["failed"]:
+            raise RuntimeError(
+                "dbt reported failed nodes despite a successful exit code"
+            )
+
+        tracker.complete_stage(gold_diagnostics)
         tracker.complete()
 
     except Exception as exc:
         # Preserve the original exception if tracking also fails.
         try:
             if tracker.manifest["status"] == "running":
-                tracker.fail(exc)
+                tracker.fail(exc, artifacts=gold_diagnostics)
         except Exception as tracking_error:
             print(
                 f"RUN TRACKING FAILED: {type(tracking_error).__name__}",

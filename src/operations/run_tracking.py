@@ -106,7 +106,7 @@ class RunTracker:
         self._active_stage = None
         self._stage_started = None
 
-    def fail(self, error: Exception) -> None:
+    def fail(self, error: Exception, artifacts: dict | None = None) -> None:
         self._require_running()
 
         updated = deepcopy(self.manifest)
@@ -119,6 +119,9 @@ class RunTracker:
                 time.perf_counter() - self._stage_started, 3
             )
             stage["error_type"] = type(error).__name__
+
+            if artifacts:
+                stage["artifacts"] = artifacts
 
         updated["status"] = "failed"
         updated["error_type"] = type(error).__name__
